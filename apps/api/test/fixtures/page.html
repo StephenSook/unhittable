@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Scanner fixture</title>
+<style>
+  body { margin: 0; padding: 40px; font: 16px/1.5 system-ui, sans-serif; }
+  button, a.btn { box-sizing: border-box; display: block; margin: 0; padding: 0; border: 0; }
+  #compliant { width: 44px;  height: 44px; }
+  #exact     { width: 24px;  height: 24px; }
+  #tiny      { width: 12px;  height: 12px; position: absolute; left: 600px; top: 600px; }
+  #crowdA    { width: 16px;  height: 16px; position: absolute; left: 100px; top: 400px; }
+  #crowdB    { width: 16px;  height: 16px; position: absolute; left: 118px; top: 400px; }
+  #wide      { width: 200px; height: 20px; }
+  #gone      { display: none; width: 50px; height: 50px; }
+</style>
+</head>
+<body>
+  <button id="compliant">ok</button>
+  <button id="exact">24</button>
+  <button id="tiny">t</button>
+  <button id="crowdA">a</button>
+  <button id="crowdB">b</button>
+  <button id="wide">A wide primary action</button>
+  <button id="gone">hidden</button>
+  <button id="off" disabled style="width:30px;height:30px">no</button>
+  <button id="ariahidden" aria-hidden="true" style="width:30px;height:30px">no</button>
+  <p id="prose">
+    This is an ordinary sentence of running text that happens to contain
+    <a id="inline" href="/somewhere">a link inside it</a>
+    and then carries on for a while afterwards so the surrounding prose is unambiguous.
+  </p>
+  <a id="blocklink" class="btn" href="/other" style="width:100px;height:60px">A block link</a>
+  <input id="field" type="text" aria-label="Your name" style="width:200px;height:18px">
+</body>
+</html>

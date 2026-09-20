@@ -193,6 +193,23 @@ export function collectTargets(opts) {
     });
   }
 
+  // A page with no viewport meta tag is laid out by a phone at a default
+  // width of around 980 CSS px and then scaled down to fit the screen. Every
+  // target on it therefore shrinks by that ratio before a finger ever arrives,
+  // and the shrink is invisible to any checker that reads CSS pixels alone.
+  // This is measured rather than inferred: the layout width is read from the
+  // document and compared against the screen the page is being shown on.
+  // The layout width is reported raw. The SCALE is deliberately NOT computed
+  // here: in the page, the layout viewport and window.innerWidth are the same
+  // number, so any ratio between them is 1 by construction. The caller knows
+  // the width it asked the browser for, so it is the only party that can
+  // compute the shrink honestly.
+  var meta = document.querySelector('meta[name="viewport" i]');
+  var layoutW = Math.max(
+    document.documentElement ? document.documentElement.clientWidth : 0,
+    window.innerWidth || 0
+  );
+
   return {
     targets: results,
     skipped: skipped,
@@ -203,6 +220,9 @@ export function collectTargets(opts) {
       devicePixelRatio: window.devicePixelRatio || 1,
       scrollHeight: document.documentElement ? document.documentElement.scrollHeight : null,
       lang: document.documentElement ? document.documentElement.lang || null : null,
+      hasViewportMeta: !!meta,
+      viewportMeta: meta ? meta.getAttribute('content') : null,
+      layoutWidth: layoutW,
     },
     truncated: skipped.overBudget > 0,
   };
