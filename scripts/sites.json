@@ -1,0 +1,51 @@
+{
+  "rationale": "Sites where being unable to click has a consequence. Weighted toward government services, healthcare and the disease organisations whose own audiences have tremor, because a failure there is not a cosmetic one. Accessibility vendors and the standards body itself are included deliberately: a measurement that exempts the people who write the rules is not a measurement.",
+  "sites": [
+    { "url": "https://www.usa.gov/",             "label": "USA.gov",                    "category": "government" },
+    { "url": "https://www.cdc.gov/",             "label": "CDC",                        "category": "government" },
+    { "url": "https://www.medicare.gov/",        "label": "Medicare",                   "category": "government" },
+    { "url": "https://www.ssa.gov/",             "label": "Social Security",            "category": "government" },
+    { "url": "https://www.nih.gov/",             "label": "NIH",                        "category": "government" },
+    { "url": "https://www.va.gov/",              "label": "Veterans Affairs",           "category": "government" },
+    { "url": "https://www.ada.gov/",             "label": "ADA.gov",                    "category": "government" },
+    { "url": "https://www.section508.gov/",      "label": "Section508.gov",             "category": "government" },
+    { "url": "https://www.gov.uk/",              "label": "GOV.UK",                     "category": "government" },
+    { "url": "https://www.nhs.uk/",              "label": "NHS",                        "category": "government" },
+
+    { "url": "https://www.parkinson.org/",       "label": "Parkinson's Foundation",     "category": "tremor community" },
+    { "url": "https://www.michaeljfox.org/",     "label": "Michael J. Fox Foundation",  "category": "tremor community" },
+    { "url": "https://www.essentialtremor.org/", "label": "International Essential Tremor Foundation", "category": "tremor community" },
+    { "url": "https://www.alz.org/",             "label": "Alzheimer's Association",    "category": "tremor community" },
+    { "url": "https://www.apdaparkinson.org/",   "label": "American Parkinson Disease Association", "category": "tremor community" },
+
+    { "url": "https://www.mayoclinic.org/",      "label": "Mayo Clinic",                "category": "healthcare" },
+    { "url": "https://www.clevelandclinic.org/", "label": "Cleveland Clinic",           "category": "healthcare" },
+    { "url": "https://www.cvs.com/",             "label": "CVS Pharmacy",               "category": "healthcare" },
+    { "url": "https://www.walgreens.com/",       "label": "Walgreens",                  "category": "healthcare" },
+    { "url": "https://www.goodrx.com/",          "label": "GoodRx",                     "category": "healthcare" },
+
+    { "url": "https://www.w3.org/WAI/",          "label": "W3C Web Accessibility Initiative", "category": "accessibility" },
+    { "url": "https://www.deque.com/",           "label": "Deque",                      "category": "accessibility" },
+    { "url": "https://webaim.org/",              "label": "WebAIM",                     "category": "accessibility" },
+    { "url": "https://www.a11yproject.com/",     "label": "The A11Y Project",           "category": "accessibility" },
+    { "url": "https://www.levelaccess.com/",     "label": "Level Access",               "category": "accessibility" },
+
+    { "url": "https://www.apple.com/",           "label": "Apple",                      "category": "technology" },
+    { "url": "https://www.microsoft.com/",       "label": "Microsoft",                  "category": "technology" },
+    { "url": "https://github.com/",              "label": "GitHub",                     "category": "technology" },
+    { "url": "https://www.wikipedia.org/",       "label": "Wikipedia",                  "category": "technology" },
+    { "url": "https://developer.mozilla.org/en-US/", "label": "MDN Web Docs",           "category": "technology" },
+
+    { "url": "https://www.npr.org/",             "label": "NPR",                        "category": "news" },
+    { "url": "https://www.bbc.com/",             "label": "BBC",                        "category": "news" },
+    { "url": "https://apnews.com/",              "label": "Associated Press",           "category": "news" },
+    { "url": "https://www.propublica.org/",      "label": "ProPublica",                 "category": "news" },
+
+    { "url": "https://www.irs.gov/",             "label": "IRS",                        "category": "government" },
+    { "url": "https://www.benefits.gov/",        "label": "Benefits.gov",               "category": "government" },
+    { "url": "https://www.healthcare.gov/",      "label": "HealthCare.gov",             "category": "government" },
+    { "url": "https://www.usps.com/",            "label": "USPS",                       "category": "government" },
+    { "url": "https://www.paypal.com/us/home",   "label": "PayPal",                     "category": "finance" },
+    { "url": "https://www.consumerfinance.gov/", "label": "Consumer Financial Protection Bureau", "category": "finance" }
+  ]
+}
