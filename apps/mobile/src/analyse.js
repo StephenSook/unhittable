@@ -6,7 +6,8 @@
 // cannot disagree.
 
 import { tremorSpectrum, accelGToDisplacementMm, peakToPeak, rms } from '@unhittable/core/tremor.js';
-import { holdFractionRect, scaleForHoldRect } from '@unhittable/core/geometry.js';
+import { holdFractionRect, scaleForHoldRect, holdOverAzimuths } from '@unhittable/core/geometry.js';
+import { removeRotation } from '@unhittable/core/attitude.js';
 import { G } from './capture.js';
 import { MM_PER_CSS_PX, WCAG_MIN_MM, WCAG_ENHANCED_MM } from './theme.js';
 
@@ -26,13 +27,33 @@ export const BAND = { loHz: 3, hiHz: 12 };
 export function analyse(grid, { mmPerDp }) {
   // Units. expo DeviceMotion reports m/s^2; the core expects g.
   const toG = (arr) => Float64Array.from(arr, (v) => v / G);
+
+  // ROTATION IS REMOVED HERE, unlike the clinical path.
+  //
+  // The phone's channel carries gravity, so a wrist that turns in place
+  // changes how much of it falls on each axis and fabricates movement: five
+  // degrees is worth 1.75 mm, which would be most of a real result. The
+  // dataset does not need this because its channel is already gravity-free;
+  // this one does. If the correction's precondition is not met, we fall back
+  // to the device axes and SAY SO rather than pretending.
+  const body = { n: grid.n, ax: toG(grid.x), ay: toG(grid.y), az: toG(grid.z),
+                 gx: grid.gx, gy: grid.gy, gz: grid.gz };
+  let ex, ey, rotationCorrected = false, gravityG = null, tiltDeg = null;
+  try {
+    const world = removeRotation(body, grid.fs);
+    ex = world.ex; ey = world.ey;
+    rotationCorrected = true; gravityG = world.gravityG; tiltDeg = world.tiltDeg;
+  } catch (e) {
+    ex = body.ax; ey = body.ay;
+    gravityG = e.gravityG ?? null;
+  }
+
   const magnitude = Float64Array.from({ length: grid.n }, (_, i) =>
     Math.hypot(grid.x[i], grid.y[i], grid.z[i]) / G);
-
   const spec = tremorSpectrum(magnitude, grid.fs, BAND);
 
-  const dx = accelGToDisplacementMm(toG(grid.x), grid.fs, BAND);
-  const dy = accelGToDisplacementMm(toG(grid.y), grid.fs, BAND);
+  const dx = accelGToDisplacementMm(ex, grid.fs, BAND);
+  const dy = accelGToDisplacementMm(ey, grid.fs, BAND);
   const a = Math.floor(grid.n * 0.2), b = Math.ceil(grid.n * 0.8);
   const x = dx.slice(a, b), y = dy.slice(a, b);
   const path = { x, y, n: x.length, fs: grid.fs, seconds: x.length / grid.fs };
@@ -64,6 +85,10 @@ export function analyse(grid, { mmPerDp }) {
     fs: grid.fs,
     measuredHz: grid.measuredHz,
     belowNyquist: grid.belowNyquist,
+    rotationCorrected,
+    hasGyro: grid.hasGyro,
+    gravityG,
+    tiltDeg,
     wcagDp, enhancedDp,
     holdAtWcag, holdAtEnhanced,
     needMm,

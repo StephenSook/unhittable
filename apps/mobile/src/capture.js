@@ -18,8 +18,16 @@
 //
 // 3. THE SIGN CONVENTION DIFFERS BETWEEN PLATFORMS and we refuse to depend on
 //    it. iOS Safari and expo both report roughly -9.81 on z when face up;
-//    the web spec says +9.81. Band-limiting to the tremor band removes the
-//    gravity term entirely, so the disagreement cannot reach the result.
+//    the web spec says +9.81. The world frame is defined by the record's own
+//    mean acceleration, so no convention is hardcoded anywhere.
+//
+// 4. ROTATION IS REMOVED HERE, AND UNLIKE THE DATASET IT HAS TO BE. The
+//    phone reports accelerationIncludingGravity, which CARRIES gravity, so a
+//    wrist that turns in place changes how much gravity falls on each axis
+//    and fabricates apparent movement: five degrees is worth 1.75 mm. The
+//    clinical recordings do not have this problem because their channel is
+//    already gravity-free, but this one does, so the gyroscope is recorded
+//    alongside and used to rotate into a frame where gravity is constant.
 
 import { DeviceMotion } from 'expo-sensors';
 
@@ -39,6 +47,7 @@ export function record({ seconds = DURATION_S, onProgress } = {}) {
     DeviceMotion.setUpdateInterval(1000 / TARGET_HZ);
 
     const t = [], ax = [], ay = [], az = [];
+    const gx = [], gy = [], gz = [];
     const started = Date.now();
     let sub = null;
     let timer = null;
@@ -48,14 +57,22 @@ export function record({ seconds = DURATION_S, onProgress } = {}) {
       if (timer) { clearInterval(timer); timer = null; }
     };
 
+    const DEG = Math.PI / 180;
     sub = DeviceMotion.addListener((d) => {
-      // accelerationIncludingGravity is the field present on every platform.
-      // acceleration needs sensor fusion and can be absent, or present and
-      // identically zero, on a device without a usable gyroscope.
+      // accelerationIncludingGravity is the field present on every platform,
+      // and it is the one we want: the attitude filter needs gravity in order
+      // to know which way is down.
       const a = d.accelerationIncludingGravity ?? d.acceleration;
       if (!a || typeof a.x !== 'number') return;
       t.push(Date.now() - started);
       ax.push(a.x); ay.push(a.y); az.push(a.z ?? 0);
+      // expo reports rotationRate in DEGREES per second; the core works in
+      // radians. Getting this wrong by 57x would not throw, it would just
+      // produce a confidently wrong correction.
+      const r = d.rotationRate;
+      gx.push(r ? (r.beta ?? 0) * DEG : 0);
+      gy.push(r ? (r.gamma ?? 0) * DEG : 0);
+      gz.push(r ? (r.alpha ?? 0) * DEG : 0);
     });
 
     timer = setInterval(() => {
@@ -69,7 +86,8 @@ export function record({ seconds = DURATION_S, onProgress } = {}) {
       if (elapsed >= seconds) {
         stop();
         if (t.length < 64) return reject(new Error(`Only ${t.length} samples arrived in ${seconds} seconds. The sensor is not delivering data.`));
-        resolve({ t, ax, ay, az, seconds: elapsed });
+        const hasGyro = gx.some((v) => v !== 0) || gy.some((v) => v !== 0) || gz.some((v) => v !== 0);
+        resolve({ t, ax, ay, az, gx, gy, gz, hasGyro, seconds: elapsed });
       }
     }, 100);
   });
@@ -83,7 +101,7 @@ export function record({ seconds = DURATION_S, onProgress } = {}) {
  * figure downstream depends on it and reporting 100 Hz while receiving 47 is
  * the kind of error that produces a wrong frequency with no warning.
  */
-export function resample({ t, ax, ay, az }) {
+export function resample({ t, ax, ay, az, gx, gy, gz, hasGyro }) {
   const n = t.length;
   const spanS = (t[n - 1] - t[0]) / 1000;
   if (!(spanS > 0)) throw new Error('The samples carry no elapsed time.');
@@ -92,7 +110,10 @@ export function resample({ t, ax, ay, az }) {
   // Snap to a sane grid: never claim more resolution than arrived.
   const gridHz = Math.max(20, Math.min(120, Math.round(measuredHz)));
   const count = Math.floor(spanS * gridHz);
-  const out = { x: new Float64Array(count), y: new Float64Array(count), z: new Float64Array(count) };
+  const out = {
+    x: new Float64Array(count), y: new Float64Array(count), z: new Float64Array(count),
+    gx: new Float64Array(count), gy: new Float64Array(count), gz: new Float64Array(count),
+  };
 
   let j = 0;
   for (let i = 0; i < count; i++) {
@@ -103,6 +124,11 @@ export function resample({ t, ax, ay, az }) {
     out.x[i] = ax[j] + (ax[j + 1] - ax[j]) * f;
     out.y[i] = ay[j] + (ay[j + 1] - ay[j]) * f;
     out.z[i] = az[j] + (az[j + 1] - az[j]) * f;
+    if (gx) {
+      out.gx[i] = gx[j] + (gx[j + 1] - gx[j]) * f;
+      out.gy[i] = gy[j] + (gy[j + 1] - gy[j]) * f;
+      out.gz[i] = gz[j] + (gz[j + 1] - gz[j]) * f;
+    }
   }
 
   return {
@@ -110,6 +136,7 @@ export function resample({ t, ax, ay, az }) {
     n: count,
     fs: gridHz,
     measuredHz,
+    hasGyro: !!hasGyro,
     // Below twice the top of the tremor band, the measurement is not
     // trustworthy and the UI says so rather than printing a number.
     belowNyquist: gridHz < 24,

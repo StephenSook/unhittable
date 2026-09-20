@@ -34,7 +34,14 @@ export function parsePadsRecord(text) {
     t[i] = +c[0]; ax[i] = +c[1]; ay[i] = +c[2]; az[i] = +c[3];
     gx[i] = +c[4]; gy[i] = +c[5]; gz[i] = +c[6];
   }
-  return { n, t, ax, ay, az, gx, gy, gz };
+  // The mean acceleration magnitude, which says whether this channel carries
+  // gravity. PADS does not: it is roughly 0.001 to 0.14 g here, not ~1 g.
+  // Callers use it to decide whether an attitude correction applies at all.
+  let sum = 0;
+  for (let i = 0; i < n; i++) sum += Math.hypot(ax[i], ay[i], az[i]);
+  const gravityG = n ? sum / n : 0;
+
+  return { n, t, ax, ay, az, gx, gy, gz, gravityG };
 }
 
 /**

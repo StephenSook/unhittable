@@ -5,7 +5,6 @@
 // not compute different ones.
 
 import { parsePadsRecord, accelGToDisplacementMm, tremorSpectrum, peakToPeak, rms, PADS_FS } from './tremor.js';
-import { removeRotation } from './attitude.js';
 
 /** WCAG 2.2 SC 2.5.8 Target Size (Minimum), Level AA. */
 export const WCAG_MIN_PX = 24;
@@ -34,25 +33,29 @@ export function cpiToPxPerMm(cpi) {
  * is a rectangle, and collapsing to a scalar would throw away the geometry
  * that decides whether a click lands.
  *
- * The axes are the WORLD horizontal plane, not the device's own. An earlier
- * version integrated the raw device axes, which silently counted wrist
- * rotation as hand movement: tilting a watch changes how gravity falls on its
- * axes, and a five degree oscillation with no translation at all integrates
- * to 1.75 mm, larger than the median amplitude in our cohort. The gyroscope
- * that PADS records alongside the accelerometer, and that the first version
- * of this code never touched, is used to rotate into a fixed frame where
- * gravity is constant and can be subtracted. See attitude.js.
+ * ON THE FRAME, AND ON A CORRECTION THAT WAS REMOVED AGAIN.
  *
- * The azimuth of that horizontal plane is undetermined, because recovering
- * compass heading needs a magnetometer. That does not affect a square target
- * and it does affect a rectangle, so `worstAzimuth` exists for the rectangle
- * case and the site scanner uses it.
+ * A rotating accelerometer that carries gravity fabricates apparent movement,
+ * because tilting changes how much gravity falls on each axis. That is real,
+ * and this project briefly shipped a gyroscope-based attitude correction for
+ * it.
+ *
+ * The correction was then removed, because PADS does not carry gravity. Its
+ * accelerometer channel is already gravity-free, the way CoreMotion's
+ * userAcceleration is: the mean magnitude across these records is 0.001 to
+ * 0.14 g rather than the ~1 g a gravity-bearing channel shows. So the
+ * confound's mechanism is absent, and the filter that was supposed to remove
+ * it was deriving attitude from noise. See docs/FALSE-GREENS.md entry 14.
+ *
+ * What remains true is that the device's axes are not fixed in space, so
+ * which way "x" points is arbitrary. That is handled where it actually
+ * matters, in geometry.js, by publishing the worst hold across azimuths
+ * rather than by pretending a heading is known.
  */
 export function recordingToPath(text, { loHz = 3.5, hiHz = 8, trim = 0.2 } = {}) {
   const r = parsePadsRecord(text);
-  const world = removeRotation(r, PADS_FS);
-  const dxAll = accelGToDisplacementMm(world.ex, PADS_FS, { loHz, hiHz });
-  const dyAll = accelGToDisplacementMm(world.ey, PADS_FS, { loHz, hiHz });
+  const dxAll = accelGToDisplacementMm(r.ax, PADS_FS, { loHz, hiHz });
+  const dyAll = accelGToDisplacementMm(r.ay, PADS_FS, { loHz, hiHz });
 
   // Drop the ends, where the analysis window tapers the signal toward zero.
   const a = Math.floor(r.n * trim);
@@ -72,9 +75,9 @@ export function recordingToPath(text, { loHz = 3.5, hiHz = 8, trim = 0.2 } = {})
     prominence: spec?.prominence ?? null,
     p2pMm: Math.max(peakToPeak(x), peakToPeak(y)),
     rmsMm: Math.max(rms(x), rms(y)),
-    // Published so the correction's effect is visible rather than asserted.
-    tiltDeg: world.tiltDeg,
-    rotationShare: world.rotationShare,
+    // The accelerometer channel's mean magnitude, published because it is
+    // what decides whether an attitude correction is even applicable.
+    gravityG: r.gravityG ?? null,
   };
 }
 

@@ -23,7 +23,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parsePadsRecord, accelGToDisplacementMm, tremorSpectrum, peakToPeak, rms, PADS_FS } from '../packages/core/src/tremor.js';
-import { removeRotation } from '../packages/core/src/attitude.js';
 import { holdFractionRect, cpiToCssPxPerMm, WCAG_MIN_PX, WCAG_ENHANCED_PX } from '../packages/core/src/geometry.js';
 import { scaleForHoldRect } from '../packages/core/src/geometry.js';
 
@@ -105,14 +104,13 @@ function measure(file, band) {
   const spec = tremorSpectrum(magnitude, PADS_FS, band);
   if (!spec) return null;
 
-  // Displacement is recovered per axis in the WORLD horizontal plane, because
-  // a cursor moves in a plane and a button is a rectangle, and because the
-  // device's own axes count wrist rotation as movement. The gyroscope PADS
-  // records alongside the accelerometer is used to rotate into a frame where
-  // gravity is constant and can be subtracted; see packages/core/src/attitude.js.
-  const world = removeRotation(r, PADS_FS);
-  const dx = accelGToDisplacementMm(world.ex, PADS_FS, band);
-  const dy = accelGToDisplacementMm(world.ey, PADS_FS, band);
+  // Displacement is recovered per axis, because a cursor moves in a plane and
+  // a button is a rectangle. No attitude correction: PADS ships a
+  // gravity-free accelerometer channel, so the rotation-into-gravity confound
+  // has no mechanism here, and the frame's arbitrary heading is handled in
+  // geometry.js by publishing the worst hold across azimuths.
+  const dx = accelGToDisplacementMm(r.ax, PADS_FS, band);
+  const dy = accelGToDisplacementMm(r.ay, PADS_FS, band);
   const a = Math.floor(r.n * 0.2), b = Math.ceil(r.n * 0.8);   // drop the tapered ends
   const x = dx.slice(a, b), y = dy.slice(a, b);
 
@@ -122,8 +120,7 @@ function measure(file, band) {
     rmsMm: Math.max(rms(x), rms(y)),
     path: { x, y, n: x.length, fs: PADS_FS, seconds: x.length / PADS_FS },
     samples: r.n,
-    tiltDeg: world.tiltDeg,
-    rotationShare: world.rotationShare,
+    gravityG: r.gravityG,
   };
 }
 
@@ -137,7 +134,6 @@ function run(band, bandLabel, conditions, files) {
       condition: conditions.get(subject) ?? 'Unknown',
       hz: m.hz, prominence: m.prominence, p2pMm: m.p2pMm, rmsMm: m.rmsMm,
       samples: m.samples, path: m.path,
-      rotationShare: m.rotationShare,
     });
   }
 
@@ -251,7 +247,7 @@ const out = {
     prominenceBar: PROMINENCE_BAR,
     prominenceBarCalibration: 'Zero of 2,000 white-noise draws and zero of 300 time-shuffled real recordings reach 5. White noise: median 2.44, p99 3.75, max 4.03.',
     pixelMapping: 'cpi / 25.4 / displayScale. A mouse, not a touchscreen. At 800 cpi one millimetre of hand movement is 31.5 CSS px, not the 3.78 px a 96 dpi screen would give.',
-    rotationCorrection: 'Acceleration is rotated into a world frame using the synchronised gyroscope and gravity is subtracted there, so wrist rotation is not counted as hand translation. Without it a five degree oscillation with zero translation integrates to 1.75 mm, which is larger than the median amplitude reported here.',
+    rotationCorrection: 'None, deliberately. A gyroscope-based attitude correction was built and then removed: PADS ships a gravity-free accelerometer channel (mean magnitude 0.001 to 0.14 g, not ~1 g), so the rotation-into-gravity confound has no mechanism here and the filter was deriving attitude from noise. The frame\'s arbitrary heading is handled instead by publishing the worst hold across azimuths.',
     amplitudeWindow: 'No taper is applied on the displacement path. A Hann window is correct for spectral estimation and wrong for amplitude reconstruction, because the envelope is never removed; an earlier version carried it into the result and inflated every hold rate.',
     cpiSwept: CPIS,
   },

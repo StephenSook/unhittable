@@ -5,7 +5,10 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
 import { removeRotation, rotate, quaternionBetween } from '../src/attitude.js';
+import { parsePadsRecord } from '../src/tremor.js';
+const require = createRequire(import.meta.url);
 import { accelGToDisplacementMm } from '../src/tremor.js';
 
 const FS = 100, N = 1024, F0 = 5.0, W = 2 * Math.PI * F0;
@@ -126,4 +129,40 @@ test('a record with no gyroscope degrades rather than throwing', () => {
   const w = removeRotation({ ax: rec.ax, ay: rec.ay, az: rec.az, n: N }, FS);
   assert.equal(w.n, N);
   assert.ok(Number.isFinite(w.gravityG));
+});
+
+test('THE PRECONDITION: real PADS records do NOT carry gravity, and the filter refuses them', () => {
+  // The defect this pins is the worst one this project had. The attitude
+  // filter assumed the accelerometer carried gravity, because gravity is the
+  // only thing that fixes an absolute vertical. PADS ships a gravity-FREE
+  // channel, the way CoreMotion's userAcceleration does.
+  //
+  // Every synthetic test above passes because it INJECTS a 1 g vector. They
+  // validated a case the production data never presents, and the filter ran
+  // on real records deriving attitude from a few thousandths of a g of noise,
+  // reporting 73 degrees of tilt on a stationary wrist.
+  //
+  // So: assert the fact about the data, and assert that the function refuses
+  // rather than quietly producing a number.
+  const fs = require('node:fs');
+  const dir = new URL('../data/', import.meta.url);
+  const files = fs.readdirSync(dir).filter((f) => f.endsWith('.txt') && f !== 'LICENSE-DATA.txt');
+  assert.ok(files.length >= 6, 'the shipped recordings must be present');
+
+  for (const f of files) {
+    const r = parsePadsRecord(fs.readFileSync(new URL(f, dir), 'utf8'));
+    assert.ok(r.gravityG < 0.6,
+      `${f} has mean |a| = ${r.gravityG.toFixed(4)} g. If this ever approaches 1 the channel ` +
+      `has changed and the attitude question must be reopened.`);
+    assert.throws(() => removeRotation(r, 100), /does not carry gravity/,
+      `${f} must be refused by the attitude filter, not silently processed`);
+  }
+});
+
+test('and the filter still works where gravity IS present, which is the phone', () => {
+  // Refusing everything would be the lazy way to pass the test above.
+  const rec = rotatingOnly(5);                 // synthetic, gravity-bearing
+  const w = removeRotation(rec, FS);
+  assert.ok(w.gravityG > 0.9 && w.gravityG < 1.1);
+  assert.ok(w.tiltDeg > 3);
 });

@@ -260,9 +260,64 @@ are least likely to go looking for.
 
 ---
 
+## 14. Fixing a confound the data did not have
+
+The worst one, and it was introduced **by fixing entry 13**.
+
+**What it said.** A gyroscope-based attitude correction, validated against
+synthetic records, rejecting rotation by 6.3x at every tilt from one degree to
+ten. The rejection figure was constant across tilt, which is what a correct
+linear correction looks like, and I said so in the commit message as evidence.
+
+**What was wrong.** The filter's entire method rests on the accelerometer
+carrying gravity, because gravity is the only thing that fixes an absolute
+vertical. **PADS does not carry gravity.** Its accelerometer channel is
+already gravity-free, the way CoreMotion's `userAcceleration` is. Measured
+across the shipped recordings, the mean acceleration magnitude is **0.001 to
+0.14 g**, never the ~1 g a gravity-bearing channel shows.
+
+So the filter took a few thousandths of a g of drift and noise, declared it to
+be the gravity vector, normalised it, and derived an attitude from it. It
+reported **73 degrees of tilt on a stationary wrist**. Every displacement,
+cohort and corpus figure computed through it was unsupported.
+
+**Why it survived.** Every test injected a 1 g vector, because that is what
+you write when you are thinking about the physics rather than about the file.
+The synthetic cases were internally correct and validated a situation the
+production data never presents. The suite was green, the ablation looked
+sensible, and the numbers moved in a direction that flattered the finding.
+
+**And the deeper error.** The confound in entry 13 is caused by *gravity
+projecting onto rotating axes*. With gravity already removed, the mechanism is
+largely absent. I had built a correction for a problem this dataset does not
+have, and the correction was worse than the problem.
+
+**What is actually true.** The device's axes still are not fixed in space, so
+which direction "x" points is arbitrary. That is a real and much smaller
+issue, and it is handled where it belongs, in the geometry, by publishing the
+worst hold across azimuths instead of pretending a heading is known.
+
+**Prevented by.** `removeRotation` now checks its own precondition and
+**refuses** a gravity-free channel by name, with the measured magnitude in the
+error. A test asserts, for every shipped recording, both that the channel is
+gravity-free and that the filter refuses it. A second test asserts the filter
+still works where gravity is present, because refusing everything is the lazy
+way to pass the first one.
+
+**The lesson, and it is the one I would keep from this whole project.** Entry
+13 was found by asking *what else could produce this reading*. Entry 14 needed
+a different question: *does the input actually have the property my method
+assumes*. A synthetic test cannot answer that, because a synthetic test is
+built from the assumption. **Measure the real input and assert the
+precondition.** One line of arithmetic over the committed files would have
+caught this before any of it was written.
+
+
+---
+
 ## The pattern
 
-Eleven of these thirteen produced **no error**. Most produced a number that was
+Twelve of these fourteen produced **no error**. Most produced a number that was
 the right shape, in the right units, in the right range. The recurring defences
 are:
 
@@ -274,7 +329,13 @@ are:
    involved.
 5. **Asking what a ratio is made of**, because two names for the same number
    always divide to 1.
-6. **An adversarial reader who wants it to be wrong.** Entries 12 and 13, the
-   two that actually threatened the finding, were found by a second model
-   asked to get this disqualified. Neither would have been found by testing
-   harder, because both passed every test we had thought to write.
+6. **An adversarial reader who wants it to be wrong.** Entries 12, 13 and 14,
+   the three that actually threatened the finding, were all found by a second
+   model asked to get this disqualified. None would have been found by testing
+   harder, because all three passed every test we had thought to write. Entry
+   14 was found in the round that reviewed the fix for entry 13, which is the
+   argument for iterating a review until a round comes back clean rather than
+   stopping after the first one.
+7. **Asserting the precondition against the real input.** A synthetic test is
+   built out of your assumptions, so it can never tell you the assumption is
+   false. Measure the actual file.

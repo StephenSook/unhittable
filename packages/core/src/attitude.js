@@ -96,18 +96,47 @@ export function quaternionBetween(from, to) {
  *   Linear acceleration in the world frame, in g, gravity removed. `ex` and
  *   `ey` span the horizontal plane; `ez` is vertical.
  */
-export function removeRotation(rec, fs, { kp = 0.5 } = {}) {
+export function removeRotation(rec, fs, { kp = 0.5, requireGravity = true } = {}) {
   const n = rec.n ?? rec.ax.length;
   const dt = 1 / fs;
 
-  // Gravity, from the record itself. Over a postural hold the mean of the
-  // accelerometer IS the gravity vector, in whatever sign convention the
-  // device uses.
+  // Gravity, from the record itself. Over a postural hold the mean of a
+  // GRAVITY-BEARING accelerometer is the gravity vector, in whatever sign
+  // convention the device uses.
   let mx = 0, my = 0, mz = 0;
   for (let i = 0; i < n; i++) { mx += rec.ax[i]; my += rec.ay[i]; mz += rec.az[i]; }
   mx /= n; my /= n; mz /= n;
-  const gMag = Math.hypot(mx, my, mz) || 1;
-  const gBody = [mx / gMag, my / gMag, mz / gMag];
+  const gMag = Math.hypot(mx, my, mz);
+
+  // THE PRECONDITION THIS FUNCTION USED TO ASSUME AND NEVER CHECKED.
+  //
+  // The whole method rests on the accelerometer carrying gravity, because
+  // gravity is the only thing that fixes an absolute vertical. If the channel
+  // has already had gravity removed, as CoreMotion's userAcceleration and the
+  // PADS recordings both have, then the record mean is a few thousandths of a
+  // g of drift and noise, and normalising it produces an attitude derived
+  // from nothing at all.
+  //
+  // An earlier version of this project ran exactly that on PADS, whose mean
+  // magnitude is 0.001 to 0.14 g, and reported 73 degrees of tilt on a
+  // stationary wrist. The synthetic tests passed because they INJECTED a 1 g
+  // vector, so they validated a case the production data never presented.
+  //
+  // So the precondition is now checked rather than assumed, and refusing is
+  // the correct behaviour: a caller holding gravity-free data does not need
+  // this correction, because the gravity projection it removes is already
+  // gone.
+  if (requireGravity && !(gMag > 0.5 && gMag < 1.6)) {
+    const e = new Error(
+      `removeRotation: this channel does not carry gravity (mean magnitude ${gMag.toFixed(4)} g, ` +
+      `expected about 1). Attitude cannot be recovered from a gravity-free accelerometer, and a ` +
+      `gravity-free channel does not need this correction.`);
+    e.code = 'NO_GRAVITY';
+    e.gravityG = gMag;
+    throw e;
+  }
+
+  const gBody = gMag > 0 ? [mx / gMag, my / gMag, mz / gMag] : [0, 0, 1];
 
   // Define the world frame so that measured gravity points along +Z.
   let q = quaternionBetween(gBody, [0, 0, 1]);
@@ -149,7 +178,7 @@ export function removeRotation(rec, fs, { kp = 0.5 } = {}) {
     const aw = rotate(q, a);
     ex[i] = aw[0];
     ey[i] = aw[1];
-    ez[i] = aw[2] - gMag;
+    ez[i] = aw[2] - gMag;   // gravity is constant in this frame
 
     const tilt = Math.acos(Math.max(-1, Math.min(1, vg[2]))) * 180 / Math.PI;
     if (tilt > maxTilt) maxTilt = tilt;

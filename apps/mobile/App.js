@@ -200,6 +200,12 @@ function Result({ r, mmPerDp, calibrated, onTapTest, onAgain }) {
         </Text>
       ) : null}
 
+      <Text style={s.caption}>
+        {r.rotationCorrected
+          ? `Wrist rotation removed using the gyroscope. Without that, tilting the phone in place would read as your hand moving: five degrees is worth about 1.75 mm.`
+          : `No gyroscope data arrived, so rotation could NOT be separated from movement. Some of the figure above may be the phone turning rather than your hand travelling. Reported rather than hidden.`}
+      </Text>
+
       {r.tap ? <TapSummary tap={r.tap} predicted={r.holdAtWcag} /> : null}
 
       <Pressable style={[s.btn, s.btnPrimary]} onPress={onTapTest}>
