@@ -64,10 +64,41 @@ away the geometry that decides whether a click lands.
 The first and last 20% of each record are discarded, where the analysis window
 tapers the signal toward zero.
 
-**Validation.** Synthetic sinusoids of known displacement are recovered to
-within 0.5 to 1.9% across 4 to 7 Hz and 0.1 to 10 mm, linear in amplitude. Real
-records match the analytic narrowband prediction `a_rms / (2*pi*f0)^2` at ratios
-of 0.81 to 1.07.
+**No taper on this path.** A Hann window is the right thing for estimating a
+spectrum and the wrong thing for reconstructing an amplitude, because the
+envelope multiplies the signal and is never removed. An earlier version
+windowed here and the recovered displacement carried the window's shape: a
+true 2.000 mm amplitude read as 0.778 mm one fifth of the way into the record.
+Peak-to-peak barely moved, because the peak lands near the middle where the
+gain is one, which is exactly why it survived review. What it corrupted was
+the hold fraction. See `docs/FALSE-GREENS.md`.
+
+**Rotation is removed first, using the gyroscope.** An accelerometer at rest
+reads gravity projected onto its own axes, so a wrist that rotates in place
+and translates not at all still produces a tremor-band signal as the share of
+gravity on each axis changes. It is not a small effect: a five degree
+oscillation at 5 Hz with zero translation integrates to **1.75 mm**, larger
+than the median amplitude across this cohort. PADS records a synchronised
+gyroscope and the first version of this project never used it. Acceleration is
+now rotated into a world frame where gravity is constant and subtracted there,
+so rotation cancels and translation survives. See `packages/core/src/attitude.js`.
+
+**Validation, and it is executable.** Every figure below is produced by
+`node scripts/validate.mjs`, which CI runs, so a regression fails the build
+rather than the reader. An earlier version of this document quoted accuracy
+figures that no code in the repository computed, which is a claim rather than
+a measurement.
+
+| what | result |
+|---|---|
+| amplitude recovery, 3.5 to 12 Hz and 0.1 to 20 mm | worst error **2.40%** |
+| flatness across the retained window | ratio 0.996 to 1.011, no envelope |
+| frequency recovery | error under **0.002 Hz** |
+| rotation rejection, tilt with zero translation | **6.3x**, at every tilt from 1 to 10 degrees |
+
+The rejection figure is constant across tilt because the artefact and the
+residual both scale linearly with angle, which is what a correct correction
+looks like and is itself a check.
 
 ## 4. Millimetres to pixels
 

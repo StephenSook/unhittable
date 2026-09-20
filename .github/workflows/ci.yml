@@ -52,6 +52,12 @@ jobs:
           test "$fail" = "0" || { echo "$fail failing tests"; exit 1; }
           test "$pass" -ge 120 || { echo "only $pass tests ran, expected at least 120; tests have gone missing"; exit 1; }
 
+      # Every accuracy figure the docs quote is produced here, so a
+      # regression in the measurement chain fails the build rather than
+      # silently changing what the documents claim.
+      - name: Validate the measurement chain against known answers
+        run: node scripts/validate.mjs
+
       # The published site is assembled rather than committed, so a broken
       # import specifier must fail the build and not the visitor.
       - name: Build the site

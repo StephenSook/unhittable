@@ -232,3 +232,20 @@ test('THE FENCE IS ON BY DEFAULT: no injected guard means loopback is refused', 
     /metadata|link-local/,
   );
 });
+
+test('REGRESSION: adjacent navigation links are NOT waved through as inline prose', async () => {
+  // The bug: the inline check subtracted only the element's own text from its
+  // parent's, so a sibling LINK supplied the characters that made the first
+  // link look like it sat in a sentence. Both then skipped the size and the
+  // spacing tests entirely, which is the opposite of what the exception is
+  // for and would have hidden real failures on every nav bar on the web.
+  const r = await scan();
+  const by = (id) => r.elements.find((e) => e.selector.includes(id));
+
+  assert.equal(by('#navA').inlineExempt, false, 'a nav link next to another nav link is not in a sentence');
+  assert.equal(by('#navB').inlineExempt, false);
+
+  // And the genuine case must still be recognised, or the fix has just
+  // disabled the exception rather than corrected it.
+  assert.equal(by('#inline').inlineExempt, true, 'a link inside running prose is still exempt');
+});

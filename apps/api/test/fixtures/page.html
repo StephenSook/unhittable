@@ -31,6 +31,11 @@
     and then carries on for a while afterwards so the surrounding prose is unambiguous.
   </p>
   <a id="blocklink" class="btn" href="/other" style="width:100px;height:60px">A block link</a>
+
+  <!-- The hostile case: adjacent inline links with no prose between them.
+       A naive detector counts the SIBLING LINK's text as "surrounding text"
+       and exempts both from the size and spacing tests. -->
+  <nav id="navbar"><a id="navA" href="/a">A</a><a id="navB" href="/b">LongOtherLink</a></nav>
   <input id="field" type="text" aria-label="Your name" style="width:200px;height:18px">
 </body>
 </html>

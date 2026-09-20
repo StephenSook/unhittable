@@ -125,17 +125,42 @@ export function collectTargets(opts) {
    * of its container is not in a sentence, however it is displayed.
    */
   function inlineInSentence(el, cs) {
-    var d = cs.display;
-    if (d !== 'inline' && d !== 'inline-block' && d !== 'inline-flex') return false;
-    if (d !== 'inline') return false;                 // block-ish boxes are not line-constrained
+    if (cs.display !== 'inline') return false;        // block boxes are not line-constrained
+
     var parent = el.parentElement;
     if (!parent) return false;
-    var own = (el.textContent || '').replace(/\s+/g, ' ').trim();
-    var all = (parent.textContent || '').replace(/\s+/g, ' ').trim();
-    if (all.length <= own.length + 1) return false;   // nothing around it
-    // Require genuine prose either side, not just whitespace or a bullet.
-    var surrounding = all.replace(own, '').replace(/[\s•|/,·>-]+/g, '');
-    return surrounding.length >= 8;
+
+    // The surrounding text must be NON-TARGET text. An earlier version
+    // subtracted only the element's own text from its parent's, so
+    //     <nav><a>A</a><a>LongOtherLink</a></nav>
+    // marked the first link as "in a sentence" because a SIBLING LINK
+    // supplied the characters. That waved ordinary adjacent navigation
+    // through both the size and the spacing tests, which is the opposite of
+    // what the exception exists for, and it would have hidden real failures
+    // on almost every navigation bar on the web.
+    //
+    // So prose is counted from text nodes only, skipping any node that lives
+    // inside an interactive element.
+    var prose = '';
+    var walker = document.createTreeWalker(parent, NodeFilter.SHOW_TEXT, null);
+    var node;
+    while ((node = walker.nextNode())) {
+      var owner = node.parentElement;
+      if (!owner) continue;
+      if (owner === el || el.contains(owner)) continue;       // the target's own text
+      if (owner.closest && owner.closest(SELECTOR)) continue; // another target's text
+      prose += node.nodeValue || '';
+    }
+    prose = prose.replace(/[\s•·|/,;:>\-–—()\[\]]+/g, '');
+    if (prose.length < 8) return false;
+
+    // "In a sentence" means adjacent to prose, not merely in a container that
+    // also holds prose somewhere. Require real text immediately either side.
+    var adjacent = '';
+    if (el.previousSibling && el.previousSibling.nodeType === 3) adjacent += el.previousSibling.nodeValue || '';
+    if (el.nextSibling && el.nextSibling.nodeType === 3) adjacent += el.nextSibling.nodeValue || '';
+    adjacent = adjacent.replace(/[\s•·|/,;:>\-–—()\[\]]+/g, '');
+    return adjacent.length >= 2;
   }
 
   function isRendered(el, cs, rect) {
