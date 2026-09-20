@@ -38,28 +38,42 @@ export function analyse(grid, { mmPerDp }) {
   // to the device axes and SAY SO rather than pretending.
   const body = { n: grid.n, ax: toG(grid.x), ay: toG(grid.y), az: toG(grid.z),
                  gx: grid.gx, gy: grid.gy, gz: grid.gz };
-  let ex, ey, rotationCorrected = false, gravityG = null, tiltDeg = null, reason = null;
+  // FAIL CLOSED.
+  //
+  // Without rotation data the phone cannot tell a hand that moved from a
+  // wrist that turned, and the difference is most of a typical result: five
+  // degrees of rotation is worth 1.75 mm. An earlier version fell back to raw
+  // device axes and carried on computing a tremor, an amplitude and a
+  // recommended button size, putting a caption under conclusions it had
+  // already drawn. A measurement that cannot be made is not a measurement
+  // with a note attached.
+  let ex, ey, gravityG = null, tiltDeg = null;
   if (!grid.hasGyro) {
-    // No rotation data arrived, so rotation CANNOT be separated from
-    // movement. Zero-filled arrays would sail through the filter and let it
-    // report a correction it did not perform.
-    ex = body.ax; ey = body.ay;
-    reason = 'no gyroscope data arrived';
-  } else {
-    try {
-      const world = removeRotation(body, grid.fs);
-      ex = world.ex; ey = world.ey;
-      rotationCorrected = true; gravityG = world.gravityG; tiltDeg = world.tiltDeg;
-    } catch (e) {
-      // Only the expected precondition failure falls back. Anything else is
-      // a real fault and must not be dressed up as a measurement.
-      if (e.code !== 'NO_GRAVITY' && e.code !== 'NO_GYRO') throw e;
-      ex = body.ax; ey = body.ay;
-      gravityG = e.gravityG ?? null;
-      reason = e.code === 'NO_GRAVITY'
-        ? `the accelerometer channel carried no gravity (${(e.gravityG ?? 0).toFixed(3)} g), so orientation could not be found`
-        : 'no gyroscope available';
-    }
+    return {
+      usable: false,
+      reason: grid.gyroCoverage > 0
+        ? `rotation data arrived for only ${Math.round(grid.gyroCoverage * 100)}% of samples, which is not enough to separate turning from moving`
+        : 'no gyroscope data arrived, so turning the phone cannot be told apart from moving it',
+      fs: grid.fs, measuredHz: grid.measuredHz, belowNyquist: grid.belowNyquist,
+      gyroCoverage: grid.gyroCoverage,
+    };
+  }
+  try {
+    const world = removeRotation(body, grid.fs);
+    ex = world.ex; ey = world.ey;
+    gravityG = world.gravityG; tiltDeg = world.tiltDeg;
+  } catch (e) {
+    // Only the expected precondition failure is handled. Anything else is a
+    // real fault and must propagate rather than be dressed as a measurement.
+    if (e.code !== 'NO_GRAVITY' && e.code !== 'NO_GYRO') throw e;
+    return {
+      usable: false,
+      reason: e.code === 'NO_GRAVITY'
+        ? `the accelerometer reported ${(e.gravityG ?? 0).toFixed(3)} g on average instead of about 1, so which way is down could not be established`
+        : 'no gyroscope available on this device',
+      fs: grid.fs, measuredHz: grid.measuredHz, belowNyquist: grid.belowNyquist,
+      gravityG: e.gravityG ?? null, gyroCoverage: grid.gyroCoverage,
+    };
   }
 
   const magnitude = Float64Array.from({ length: grid.n }, (_, i) =>
@@ -88,6 +102,7 @@ export function analyse(grid, { mmPerDp }) {
   const needMm = k === null ? null : WCAG_MIN_MM * k;
 
   return {
+    usable: true,
     path,
     hz: spec?.hz ?? null,
     prominence: spec?.prominence ?? null,
@@ -99,9 +114,9 @@ export function analyse(grid, { mmPerDp }) {
     fs: grid.fs,
     measuredHz: grid.measuredHz,
     belowNyquist: grid.belowNyquist,
-    rotationCorrected,
-    rotationSkippedReason: reason,
+    rotationCorrected: true,
     hasGyro: grid.hasGyro,
+    gyroCoverage: grid.gyroCoverage,
     gravityG,
     tiltDeg,
     wcagDp, enhancedDp,

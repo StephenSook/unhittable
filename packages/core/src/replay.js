@@ -6,7 +6,7 @@
 
 import { parsePadsRecord, accelGToDisplacementMm, tremorSpectrum, peakToPeak, rms, PADS_FS } from './tremor.js';
 import { derotate } from './attitude.js';
-import { planeFamily, extent3D } from './geometry.js';
+import { planeFamily, extent3D, PLANE_COUNT } from './geometry.js';
 
 /** WCAG 2.2 SC 2.5.8 Target Size (Minimum), Level AA. */
 export const WCAG_MIN_PX = 24;
@@ -62,7 +62,7 @@ export function cpiToPxPerMm(cpi) {
  * All three axes are kept, because the out-of-plane component was being
  * silently discarded and it is large.
  */
-export function recordingToPath(text, { loHz = 3.5, hiHz = 8, trim = 0.2, planes = 24 } = {}) {
+export function recordingToPath(text, { loHz = 3.5, hiHz = 8, trim = 0.2, planes = PLANE_COUNT } = {}) {
   const r = parsePadsRecord(text);
 
   // Gyroscope only, from identity, no accelerometer feedback: this removes

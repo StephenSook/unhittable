@@ -151,6 +151,30 @@ function Measuring({ progress }) {
 /* ----------------------------------------------------------------- result */
 
 function Result({ r, mmPerDp, calibrated, onTapTest, onAgain }) {
+  // A measurement that could not be made shows nothing but why, and an
+  // invitation to repeat it. Printing an amplitude under a warning is how a
+  // caveat gets read as a footnote.
+  if (r.usable === false) {
+    return (
+      <ScrollView contentContainerStyle={s.page}>
+        <Text style={s.micro}>MEASUREMENT NOT MADE</Text>
+        <Text style={s.h2}>This take cannot be trusted.</Text>
+        <View style={s.notice}><Text style={s.noticeText}>{r.reason}</Text></View>
+        <Text style={s.body}>
+          Nothing is reported from it. The alternative would be an amplitude and a button size
+          computed from a hand that might simply have been turning, printed under a warning, and a
+          warning under a number is read as a footnote.
+        </Text>
+        <Text style={s.caption}>
+          Measured rate {r.measuredHz ? `${r.measuredHz.toFixed(0)} Hz` : 'unknown'}
+          {typeof r.gyroCoverage === 'number' ? ` · rotation data on ${Math.round(r.gyroCoverage * 100)}% of samples` : ''}
+        </Text>
+        <Pressable style={[s.btn, s.btnPrimary]} onPress={onAgain}>
+          <Text style={s.btnPrimaryText}>Try again</Text>
+        </Pressable>
+      </ScrollView>
+    );
+  }
   const need = r.needMm;
   const cannot = r.belowNyquist;
   return (
@@ -201,9 +225,9 @@ function Result({ r, mmPerDp, calibrated, onTapTest, onAgain }) {
       ) : null}
 
       <Text style={s.caption}>
-        {r.rotationCorrected
-          ? `Wrist rotation removed using the gyroscope. Without that, tilting the phone in place would read as your hand moving: five degrees is worth about 1.75 mm.`
-          : `Rotation could NOT be separated from movement: ${r.rotationSkippedReason ?? 'the correction did not run'}. Some of the figure above may be the phone turning rather than your hand travelling. Reported rather than hidden.`}
+        Wrist rotation removed using the gyroscope, on {Math.round((r.gyroCoverage ?? 1) * 100)}% of
+        samples. Without that, tilting the phone in place would read as your hand moving: five
+        degrees is worth about 1.75 mm.
       </Text>
 
       {r.tap ? <TapSummary tap={r.tap} predicted={r.holdAtWcag} /> : null}

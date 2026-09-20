@@ -205,6 +205,15 @@ export function evaluateSpacing(rects, { min = WCAG_MIN_PX } = {}) {
 //     which is well defined no matter how the tremor is oriented.
 // ---------------------------------------------------------------------------
 
+/**
+ * How many plane orientations every published figure is computed across.
+ *
+ * Chosen by measuring convergence, not picked: rigidly rotating a trace, which
+ * changes nothing physical, moves the worst-plane hold by 7.3 points at 24
+ * planes, 2.4 at 48, and under 1 point from 120 upward.
+ */
+export const PLANE_COUNT = 120;
+
 /** Rotate a path in the horizontal plane. Cheap: two multiplies per sample. */
 export function rotatePath(path, radians) {
   const c = Math.cos(radians), s = Math.sin(radians);
@@ -282,30 +291,47 @@ export function judgeElement(rect, spacing, pathOrPaths, pxPerMm, { want = 0.95 
   // `paths` is therefore a family of plane projections, and a single one of
   // them is a guess rather than a measurement.
   //
-  // The PUBLISHED figure is the MEDIAN of the family, not the worst. The
-  // worst plane is the one containing the tremor's dominant direction, and
-  // reporting it would assume the desk happens to lie along the single most
-  // unfavourable axis. That is a real possibility, not a typical one, so it
-  // is carried as the bottom of a published range instead of as the headline.
-  // The same reasoning chose a median recording over the strongest one.
+  // The PUBLISHED figure is the WORST of the family, and that is forced
+  // rather than chosen.
+  //
+  // A median over sampled planes is not invariant to the frame the data
+  // happens to arrive in. Measured directly: rigidly rotating a trace, which
+  // changes no physics at all, moved the median hold on a 143 by 30 control
+  // between 36% and 82%, and it did NOT converge with more samples, because
+  // the median depends on how the sampled planes are distributed rather than
+  // on the path. The worst converges: at 120 planes it varies by under one
+  // point across rigid rotations, and by 0.8 points at 300.
+  //
+  // So the worst is the only summary here that is a property of the hand
+  // instead of a property of our coordinate system. It is also the right
+  // shape for the claim, because an accessibility criterion is a floor.
   const holds = paths.map((p) => holdFractionRect(p, pxPerMm, rect.w, rect.h)).sort((a, b) => a - b);
-  const hold = holds[Math.floor(holds.length / 2)];
+  const hold = holds[0];
   const worst = holds[0];
   const best = holds[holds.length - 1];
 
-  // The size recommendation takes the MEDIAN plane's requirement to match the
-  // headline, and reports the maximum separately. It must not be the scale of
-  // whichever plane held worst at the CURRENT size: the orderings cross as a
-  // rectangle grows, so that published a size which failed at some other
-  // orientation, which is the one thing a size recommendation must not do.
-  const scales = [];
-  for (const p of paths) {
-    const k = scaleForHoldRect(p, pxPerMm, rect.w, rect.h, want);
-    if (k !== null) scales.push(k);
+  // The size recommendation is the MAXIMUM required across planes, because it
+  // has to hold everywhere rather than on a typical member. It must also not
+  // be the scale of whichever plane held worst at the CURRENT size, because
+  // the orderings cross as a rectangle grows.
+  //
+  // Short-circuit: if the worst plane already reaches the target rate, the
+  // control needs no enlargement and a bisection per plane would be a hundred
+  // and twenty searches for the answer 1. On a real page most controls take
+  // this branch, and without it a scan of a large page takes minutes.
+  let scale, scaleWorst;
+  if (hold >= want) {
+    scale = 1; scaleWorst = 1;
+  } else {
+    let mx = null, complete = true;
+    for (const p of paths) {
+      const k = scaleForHoldRect(p, pxPerMm, rect.w, rect.h, want);
+      if (k === null) { complete = false; break; }
+      if (mx === null || k > mx) mx = k;
+    }
+    scale = complete ? mx : null;
+    scaleWorst = scale;
   }
-  scales.sort((a, b) => a - b);
-  const scale = scales.length === paths.length ? scales[Math.floor(scales.length / 2)] : null;
-  const scaleWorst = scales.length === paths.length ? scales[scales.length - 1] : null;
 
   return {
     wPx: rect.w,
@@ -368,7 +394,7 @@ export function azimuthFamily(path, steps = 12) {
  * It also means the out-of-plane component is never silently discarded, which
  * is what integrating raw device x and y had been doing.
  */
-export function planeFamily(path3, count = 24) {
+export function planeFamily(path3, count = PLANE_COUNT) {
   const n = path3.n;
   const out = [];
   const golden = Math.PI * (3 - Math.sqrt(5));
@@ -411,23 +437,31 @@ export function planeFamily(path3, count = 24) {
   return out;
 }
 
-/** The largest extent in ANY direction in three dimensions. */
-export function extent3D(path3, samples = 64) {
-  let worst = 0;
-  const golden = Math.PI * (3 - Math.sqrt(5));
-  for (let i = 0; i < samples; i++) {
-    const z = 1 - (2 * (i + 0.5)) / samples;
-    const r = Math.sqrt(Math.max(0, 1 - z * z));
-    const th = golden * i;
-    const d = [r * Math.cos(th), r * Math.sin(th), z];
-    let lo = Infinity, hi = -Infinity;
-    for (let k = 0; k < path3.n; k++) {
-      const v = path3.x[k] * d[0] + path3.y[k] * d[1] + path3.z[k] * d[2];
-      if (v < lo) lo = v; if (v > hi) hi = v;
+/**
+ * The largest extent in any direction in three dimensions, computed EXACTLY.
+ *
+ * This is the diameter of the point set, and the maximum over directions of
+ * the projected extent equals the maximum pairwise distance. An earlier
+ * version sampled 64 directions and called itself rotation invariant, which
+ * it was not: it read 2.36 percent low on one shipped recording and moved
+ * when the trace was rigidly rotated. A quantity described as invariant has
+ * to actually be.
+ *
+ * Quadratic in the sample count, which for a ten second record at 100 Hz is
+ * a few hundred thousand operations and takes under a millisecond.
+ */
+export function extent3D(path3) {
+  let best = 0;
+  const { x, y, z, n } = path3;
+  for (let i = 0; i < n; i++) {
+    const xi = x[i], yi = y[i], zi = z[i];
+    for (let j = i + 1; j < n; j++) {
+      const dx = xi - x[j], dy = yi - y[j], dz = zi - z[j];
+      const d2 = dx * dx + dy * dy + dz * dz;
+      if (d2 > best) best = d2;
     }
-    if (hi - lo > worst) worst = hi - lo;
   }
-  return worst;
+  return Math.sqrt(best);
 }
 
 /** Roll a page's per-element verdicts into the numbers a report leads with. */
@@ -454,3 +488,61 @@ export function holdSquare(path, pxPerMm, sizePx) {
   return holdFractionRect(path, pxPerMm, sizePx, sizePx);
 }
 
+
+/**
+ * Judge a whole page. THE one entry point.
+ *
+ * Four things were computing verdicts independently: the scan API, the
+ * re-judge script, the cohort generator and the browser. They drifted, and
+ * the drift was invisible because each produced plausible numbers. For the
+ * same control and the same recording, the scanner reported 60.1% hold and
+ * 235 px required while the re-judge script reported 47.1% and 296 px,
+ * because one used the plane family and the other re-derived azimuths from
+ * the display projection.
+ *
+ * Anything that publishes a verdict calls this.
+ */
+export function judgePage(rects, family, pxPerMm, { want = 0.95, inlineExempt = [] } = {}) {
+  if (!Array.isArray(family) || family.length === 0) {
+    throw new Error('judgePage: a plane family is required; a single path is a guess at an unknown orientation');
+  }
+  const spacing = evaluateSpacing(rects);
+  const elements = rects.map((rect, i) => {
+    const j = judgeElement(rect, spacing[i], family, pxPerMm, { want });
+    const inline = !!inlineExempt[i];
+    return {
+      ...j,
+      inlineExempt: inline,
+      wcagPass: j.wcagPass || inline,
+      wcagExemptReason: j.sizeOk ? null
+        : inline ? 'inline, in a sentence'
+        : (j.spacingApplies && j.spacingPass) ? 'undersized but adequately spaced'
+        : null,
+    };
+  });
+  return { elements, summary: summarise(elements, { want }) };
+}
+
+/**
+ * What one recording does to the two published target sizes, across the
+ * whole plane family. Used by the page so its headline cannot differ from a
+ * scan report's.
+ */
+export function judgeRecording(family, pxPerMm, { want = 0.95 } = {}) {
+  const at = (px) => {
+    const hs = family.map((p) => holdFractionRect(p, pxPerMm, px, px)).sort((a, b) => a - b);
+    return { hold: hs[0], best: hs[hs.length - 1] };
+  };
+  const ks = [];
+  for (const p of family) {
+    const k = scaleForHoldRect(p, pxPerMm, WCAG_MIN_PX, WCAG_MIN_PX, want);
+    if (k !== null) ks.push(k);
+  }
+  return {
+    minimum: at(WCAG_MIN_PX),
+    enhanced: at(WCAG_ENHANCED_PX),
+    // Must hold on every plane, so the maximum.
+    needPx: ks.length === family.length ? WCAG_MIN_PX * Math.max(...ks) : null,
+    planes: family.length,
+  };
+}

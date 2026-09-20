@@ -74,9 +74,13 @@ jobs:
             exit 1;
           }
 
-      # Every published figure is generated into docs/FACTS.md from one run.
-      # The cohort half needs no database, so it is checked here; the corpus
-      # half needs one and is regenerated when the corpus is re-seeded.
+      # Every judge-facing surface is compared against the generated facts by
+      # labelled field, and any superseded figure that survived anywhere fails
+      # the build. The previous guard searched for a few substrings, which
+      # passes happily on a document that contradicts itself in four places.
+      - name: Judge-facing claims agree with one another
+        run: node scripts/audit-claims.mjs
+
       - name: The published figures match the committed cohort
         run: |
           node -e "

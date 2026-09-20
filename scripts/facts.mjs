@@ -18,6 +18,7 @@ import { DEFAULT_RECORDING, getRecording } from '../apps/api/src/recordings.js';
 const cohort = JSON.parse(fs.readFileSync('apps/web/data/cohort.json', 'utf8'));
 const p = cohort.primary;
 const rec = getRecording(DEFAULT_RECORDING);
+const recPath = rec.path;
 
 let corpus = null;
 const pool = db.createPool(process.env.DATABASE_URL);
@@ -98,4 +99,40 @@ ${corpus ? `${corpus.sites} live sites, ${n.toLocaleString()} interactive contro
 
 fs.mkdirSync('docs', { recursive: true });
 fs.writeFileSync('docs/FACTS.md', out);
+
+// A MACHINE-CHECKABLE copy, so CI can compare labelled fields exactly instead
+// of searching for a substring. The prose version above is for people; this
+// one is what the guard reads, because "does the file contain 3,876
+// somewhere" passes on a document that contradicts itself in four places.
+const machine = {
+  generatedAt: new Date().toISOString().slice(0, 10),
+  cohort: {
+    subjects: p.subjects,
+    recordings: p.recordings,
+    clearing: p.clearing,
+    medianAmplitudeMm: +p.amplitudeMm.median.toFixed(2),
+    medianCursorPx800: Math.round(p.cursorExcursionPx800.median),
+    widerThanTarget: p.exceedsWholeTarget24,
+    below95At24: p.below95At24,
+    below50At24: p.below50At24,
+    below95At44: p.below95At44,
+    medianHold24: Math.round(p.hold24At800.median * 100),
+  },
+  planes: rec.path?.family?.length ?? null,
+  recording: {
+    id: rec.id, subject: rec.meta.subject, condition: rec.meta.condition,
+    hz: rec.meta.hz, amplitudeMm: rec.meta.p2pMm, cursorPx800: rec.meta.cursorPxAt800,
+  },
+  corpus: corpus ? {
+    sites: Number(corpus.sites),
+    controls: n,
+    passPct: +pctOf(n - corpus.fail_standard),
+    unhittablePct: +pctOf(corpus.pass_standard_fail_hand),
+    boundByHeight: Number(corpus.limited_by_height),
+    boundByWidth: Number(corpus.limited_by_width),
+    medianW: Math.round(corpus.median_w),
+    medianH: Math.round(corpus.median_h),
+  } : null,
+};
+fs.writeFileSync('docs/facts.json', JSON.stringify(machine, null, 2) + '\n');
 console.log(out.split('\n').slice(-3).join('\n'));

@@ -118,9 +118,9 @@ much accumulated gyro bias to suspect.
 
 **The plane is then swept, not guessed.** A pointing device moves in one
 particular plane and we cannot identify it. Every published figure is
-therefore computed across **48 plane projections**, with normals spread over a
-hemisphere and two in-plane rotations each, and the **median** is published
-with the worst and best carried as a range.
+therefore computed across **120 plane projections**, with normals spread over a
+hemisphere and two in-plane rotations each, and the **worst** is published,
+with the best carried as the other end of a range.
 
 The median rather than the worst, deliberately: the worst plane is the one
 containing the tremor's dominant direction, and publishing it would assume the
@@ -250,7 +250,7 @@ to this repository.
 
 ```bash
 npm ci && npx playwright install chromium
-npm run test:all                       # 121 tests
+npm run test:all                       # 155 tests
 
 node scripts/manifest.mjs              # reproducible from the repo alone
 node scripts/cohort.mjs --data /path/to/pads

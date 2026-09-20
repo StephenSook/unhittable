@@ -7,6 +7,11 @@ measurement tool is not an error message. It is a plausible number.
 Each one records what the wrong output looked like, why it looked right, and what
 now prevents it from coming back.
 
+**HISTORICAL BY DESIGN.** Every figure and method described below as wrong IS
+wrong, and is quoted so the failure is legible. Nothing here describes current
+behaviour. For what the code does now, see `docs/METHOD.md`, and for the
+current figures see `docs/FACTS.md`, which is generated.
+
 ---
 
 ## 1. Millimetres to pixels, off by 8.3x

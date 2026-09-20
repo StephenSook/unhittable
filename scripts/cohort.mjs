@@ -63,9 +63,10 @@ const EXCLUDED_WITH_REASON = {
 const PROMINENCE_BAR = 5;
 
 const CPIS = [200, 400, 800, 1200, 1600];
-// How many rotations of the horizontal plane to consider. The frame's heading
-// is not recoverable, so every published figure is the floor across these.
-const AZIMUTHS = 12;
+// How many plane orientations to consider. Chosen by measuring convergence:
+// the worst-plane figure varies by under one point across rigid rotations
+// from 120 upward, and by 7.3 points at 24.
+const PLANES = 120;
 const SIZES = [24, 32, 44, 64, 96, 128, 192, 256];
 
 function quantile(sorted, q) {
@@ -107,7 +108,7 @@ function loadConditions(dir) {
 function measure(file, band) {
   const text = fs.readFileSync(file, 'utf8');
   let p;
-  try { p = recordingToPath(text, { loHz: band.loHz, hiHz: band.hiHz, planes: AZIMUTHS * 2 }); }
+  try { p = recordingToPath(text, { loHz: band.loHz, hiHz: band.hiHz, planes: PLANES }); }
   catch { return null; }
   if (!p || !p.n || p.prominence === null) return null;
   return {
@@ -151,19 +152,20 @@ function run(band, bandLabel, conditions, files) {
     r.pointing = {};
     for (const cpi of CPIS) {
       const ppm = cpiToCssPxPerMm(cpi);
-      // MEDIAN across the plane family, matching what the product publishes.
-      const medianHold = (px) => {
-        const hs = family.map((p) => holdFractionRect(p, ppm, px, px)).sort((a, b) => a - b);
-        return hs[Math.floor(hs.length / 2)];
+      // WORST across the plane family, matching what the product publishes.
+      // A median over sampled planes is not invariant to the frame the data
+      // arrived in and does not converge with more samples; the worst does.
+      const worstHold = (px) => {
+        let w = Infinity;
+        for (const m of family) { const h = holdFractionRect(m, ppm, px, px); if (h < w) w = h; }
+        return w;
       };
-      const worstHold = medianHold;
       const ks = [];
-      for (const p of family) {
-        const k = scaleForHoldRect(p, ppm, WCAG_MIN_PX, WCAG_MIN_PX, 0.95);
+      for (const m of family) {
+        const k = scaleForHoldRect(m, ppm, WCAG_MIN_PX, WCAG_MIN_PX, 0.95);
         if (k !== null) ks.push(k);
       }
-      ks.sort((a, b) => a - b);
-      const need = ks.length === family.length ? ks[Math.floor(ks.length / 2)] : null;
+      const need = ks.length === family.length ? Math.max(...ks) : null;
       r.pointing[cpi] = {
         pxPerMm: ppm,
         p2pPx: r.extentMm * ppm,
@@ -269,7 +271,7 @@ const out = {
     rotationCorrection: 'None, deliberately. A gyroscope-based attitude correction was built and then removed: PADS ships a gravity-free accelerometer channel (mean magnitude 0.001 to 0.14 g, not ~1 g), so the rotation-into-gravity confound has no mechanism here and the filter was deriving attitude from noise. The frame\'s arbitrary heading is handled instead by publishing the worst hold across azimuths.',
     amplitudeWindow: 'No taper is applied on the displacement path. A Hann window is correct for spectral estimation and wrong for amplitude reconstruction, because the envelope is never removed; an earlier version carried it into the result and inflated every hold rate.',
     cpiSwept: CPIS,
-    planes: `Gyroscope de-rotation leaves a frame that is fixed but of unknown orientation, so every hold and every required size is the MEDIAN across ${AZIMUTHS * 2} plane projections rather than a single guess. The worst plane is the one containing the tremor's dominant direction and is carried as the bottom of a range rather than as the headline. Amplitude is the largest extent in any direction in space.`,
+    planes: `Gyroscope de-rotation leaves a frame that is fixed but of unknown orientation, so every hold and every required size is the WORST across ${PLANES} plane projections. The worst is used because it is the only summary that is invariant to the arbitrary frame the data arrived in: rigidly rotating a trace moves a median by up to 22 points and it does not converge with more sampling, while the worst varies by under one point from 120 planes upward. Amplitude is the exact largest extent in any direction in space.`,
   },
   primary,
   sensitivity: wide,

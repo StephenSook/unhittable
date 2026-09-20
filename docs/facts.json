@@ -1,0 +1,34 @@
+{
+  "generatedAt": "2026-09-20",
+  "cohort": {
+    "subjects": 260,
+    "recordings": 1560,
+    "clearing": 52,
+    "medianAmplitudeMm": 3.08,
+    "medianCursorPx800": 97,
+    "widerThanTarget": 48,
+    "below95At24": 45,
+    "below50At24": 31,
+    "below95At44": 34,
+    "medianHold24": 41
+  },
+  "planes": 120,
+  "recording": {
+    "id": "071_HoldWeight_RightWrist",
+    "subject": "071",
+    "condition": "Parkinson's",
+    "hz": 7.08,
+    "amplitudeMm": 2.657,
+    "cursorPx800": 83.7
+  },
+  "corpus": {
+    "sites": 38,
+    "controls": 3876,
+    "passPct": 95.8,
+    "unhittablePct": 84.4,
+    "boundByHeight": 3387,
+    "boundByWidth": 230,
+    "medianW": 145,
+    "medianH": 29
+  }
+}

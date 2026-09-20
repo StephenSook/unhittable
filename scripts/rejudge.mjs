@@ -7,7 +7,7 @@
 // check: if a code change alters a published number, this says so in seconds.
 
 import { recordingToPath } from '../packages/core/src/replay.js';
-import { evaluateSpacing, judgeElement, summarise, cpiToCssPxPerMm, azimuthFamily } from '../packages/core/src/geometry.js';
+import { judgePage, cpiToCssPxPerMm } from '../packages/core/src/geometry.js';
 import { getRecording, DEFAULT_RECORDING } from '../apps/api/src/recordings.js';
 import * as db from '../apps/api/src/db.js';
 
@@ -20,9 +20,17 @@ if (!pool) { console.error('DATABASE_URL is required'); process.exit(1); }
 const rec0 = getRecording(DEFAULT_RECORDING);
 const { rows } = await pool.query(
   'SELECT id, recording_id, cpi, want, report FROM scans WHERE in_corpus ORDER BY id');
+
+// ONE TRANSACTION FOR THE WHOLE RUN. Per-scan commits meant a reader during
+// the run saw already-updated scans mixed with old ones, and an interruption
+// left that hybrid corpus permanently. Either the whole corpus moves to the
+// new method or none of it does.
+const client = await pool.connect();
+await client.query('BEGIN');
 console.log(`re-judging ${rows.length} stored scans`);
 
 let changed = 0;
+try {
 for (const row of rows) {
   // Every corpus row is re-judged against the CURRENT default, because the
   // published figure must describe one consistent hand rather than whichever
@@ -30,33 +38,22 @@ for (const row of rows) {
   const rec = getRecording(DEFAULT_RECORDING);
   const report = row.report;
   const rects = report.elements.map((e) => ({ x: e.x, y: e.y, w: e.w, h: e.h }));
-  const spacing = evaluateSpacing(rects);
   const ppm = cpiToCssPxPerMm(row.cpi);
-  const family = azimuthFamily(rec.path, 12);
 
-  const before = report.summary.passesStandardButNotHand;
-  report.elements = report.elements.map((e, i) => {
-    const j = judgeElement(rects[i], spacing[i], family, ppm, { want: row.want });
-    return {
-      ...e, ...j,
-      wcagPass: j.wcagPass || e.inlineExempt,
-      wcagExemptReason: j.sizeOk ? null
-        : e.inlineExempt ? 'inline, in a sentence'
-        : (j.spacingApplies && j.spacingPass) ? 'undersized but adequately spaced'
-        : null,
-    };
+  // The SAME entry point the live scanner uses, with the recording's own
+  // plane family. This script used to re-derive azimuths from the display
+  // projection, so running it rewrote the corpus with a different method than
+  // new scans produced.
+  const judged = judgePage(rects, rec.path.family, ppm, {
+    want: row.want,
+    inlineExempt: report.elements.map((e) => e.inlineExempt),
   });
-  const s = summarise(report.elements, { want: row.want });
+  report.elements = report.elements.map((e, i) => ({ ...e, ...judged.elements[i] }));
+
+  const s = judged.summary;
   report.summary = { ...report.summary, ...s };
   if (s.passesStandardButNotHand !== before) changed++;
 
-  // ONE TRANSACTION PER SCAN. These were three separate autocommit queries, so
-  // a failure between the delete and the insert left a scan with no element
-  // rows at all, silently dropping it from the public aggregate, and a reader
-  // during the run could observe a mixture of two algorithms.
-  const client = await pool.connect();
-  try {
-  await client.query('BEGIN');
   await client.query(
     `UPDATE scans SET recording_id = $8, report = $2, n_wcag_pass = $3, n_hand_pass = $4,
        n_standard_not_hand = $5, median_hold = $6, worst_hold = $7 WHERE id = $1`,
@@ -77,14 +74,18 @@ for (const row of rows) {
         inline_exempt, hold, hold_best, hold_spread, binding_side, standard_not_hand)
        VALUES ${values.join(',')}`, params);
   }
-  await client.query('COMMIT');
-  } catch (e) {
-    await client.query('ROLLBACK').catch(() => {});
-    throw new Error(`scan ${row.id} could not be re-judged, and was rolled back rather than left without elements: ${e.message}`);
-  } finally {
-    client.release();
-  }
 }
+
+} catch (e) {
+  await client.query('ROLLBACK').catch(() => {});
+  client.release();
+  console.error(`\nrolled back the entire run rather than leaving a hybrid corpus: ${e.message}`);
+  await pool.end();
+  process.exit(1);
+}
+await client.query('COMMIT');
+client.release();
+console.log('committed as one transaction');
 
 const { aggregate: a } = await db.corpusSummary(pool, rec0.id);
 const n = Number(a.targets);

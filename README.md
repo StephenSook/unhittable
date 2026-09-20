@@ -11,8 +11,8 @@ tick. The number comes from a 2006 study of able-bodied thumbs on touchscreens.
 We replayed **clinically recorded tremor** against it.
 
 ```
-38 live sites          3,918 interactive controls measured as rendered
-95.9% pass WCAG 2.5.8  71.7% of them cannot be reliably held
+38 live sites          3,876 interactive controls measured as rendered
+95.8% pass WCAG 2.5.8  84.4% of them cannot be reliably held
                        by a MEDIAN clinically recorded tremor
 ```
 
@@ -41,14 +41,14 @@ Paste a URL into the live page and it will do this to your site in about three s
 | Subjects measured | **260** clinically assessed people |
 | Postural recordings analysed | **1,560** |
 | Containing a detectable tremor | **52** (3.3%), from 29 subjects |
-| Median amplitude of those 52 | **3.05 mm**, which is 96 px of cursor travel at 800 cpi |
+| Median amplitude of those 52 | **3.08 mm**, which is 97 px of cursor travel at 800 cpi |
 | Tremor wider than the whole 24 px target | **48 of 52** |
-| Hold a 24 px target under 95% of the time | **39 of 52** |
-| Miss more often than they hit | **25 of 52** |
-| Still under 95% at the 44 px AAA size | **30 of 52** |
+| Hold a 24 px target under 95% of the time | **45 of 52** |
+| Miss more often than they hit | **31 of 52** |
+| Still under 95% at the 44 px AAA size | **34 of 52** |
 
-Across the 38-site corpus the median interactive control is **143 × 30 px**. It passes.
-It is bound by its **height** on 3,415 controls against 243 bound by width, because
+Across the 38-site corpus the median interactive control is **145 × 29 px**. It passes.
+It is bound by its **height** on 3,387 controls against 230 bound by width, because
 the real web is made of wide short buttons and a square minimum structurally cannot
 describe the shape that fails.
 
@@ -88,7 +88,7 @@ everyone.
 - **We cannot identify the plane a mouse moves in.** Gyroscope de-rotation leaves a
   frame that is fixed but arbitrarily oriented, because a gravity-free channel
   offers nothing to recover a vertical from. Every published figure is therefore
-  the **median across 48 plane projections**, with the worst and best carried as a
+  the **worst across 120 plane projections**, with the worst and best carried as a
   range. Not the worst: that plane is the one containing the tremor's dominant
   direction, and publishing it would assume the desk lies along the single most
   unfavourable axis.
@@ -109,8 +109,10 @@ everyone.
   acceleration is OS-specific and user-configurable, so every result is published as a
   sweep across 200 to 1600 cpi rather than as a single number.
 
-Every figure above is generated into [`docs/FACTS.md`](docs/FACTS.md) from one run,
-and CI fails if that file is stale. These numbers have been regenerated four times
+Every figure above is generated into [`docs/FACTS.md`](docs/FACTS.md) and
+[`docs/facts.json`](docs/facts.json) from one run, and CI compares every
+judge-facing surface against it by labelled field, failing on any contradiction
+or any superseded value that survived somewhere. These numbers have been regenerated four times
 as defects were found, and a figure retyped into three documents disagrees with
 itself eventually.
 
@@ -119,7 +121,7 @@ itself eventually.
 ```bash
 npm ci
 npx playwright install chromium
-npm run test:all          # 121 tests
+npm run test:all          # 155 tests
 npm run build:web         # assembles _site/
 npx serve _site           # or any static server
 

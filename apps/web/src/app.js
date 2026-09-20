@@ -9,7 +9,7 @@
 import { recordingToPath } from './core/replay.js';
 import {
   holdFractionRect, cpiToCssPxPerMm, minimumBox, scaleForHoldRect,
-  WCAG_MIN_PX, WCAG_ENHANCED_PX,
+  judgeRecording, WCAG_MIN_PX, WCAG_ENHANCED_PX,
 } from './core/geometry.js';
 import { tremorSpectrum, PADS_FS } from './core/tremor.js';
 import { parsePadsRecord } from './core/tremor.js';
@@ -127,7 +127,8 @@ function renderMeta() {
       ? 'yes, clears a bar no null draw reached'
       : 'no, this recording sits at the noise floor'],
     [`Cursor travel at ${state.cpi} cpi`, `${(meta.p2pMm * ppm).toFixed(0)} px`],
-    ['Smallest box never left', `${box.wPx.toFixed(0)} by ${box.hPx.toFixed(0)} px`],
+    ['Plane orientations swept', `${state.current.path.family.length}`],
+    ['Wrist rotation removed', meta.sweptDeg ? `${Math.round(meta.sweptDeg)} degrees swept` : 'no gyroscope in this record'],
   ];
   $('meta').innerHTML = rows.map(([k, v]) =>
     `<dt class="micro" style="color:var(--dim);text-transform:none;letter-spacing:0">${esc(k)}</dt>` +
@@ -258,13 +259,21 @@ function tick() {
 
   frames++; if (inside) insideCount++;
   if (frames % 8 === 0) {
-    const live = holdFractionRect(p, ppm, state.size, state.size);
+    // The worst plane, like every other published figure, not the projection
+    // that happens to be animating.
+    const fam = state.current.path.family;
+    let live = Infinity, needK = 0;
+    for (const m of fam) {
+      const h = holdFractionRect(m, ppm, state.size, state.size);
+      if (h < live) live = h;
+      const k = scaleForHoldRect(m, ppm, state.size, state.size, 0.95);
+      if (k !== null && k > needK) needK = k;
+    }
     $('liveHold').textContent = pct(live);
     $('liveHold').className = `verdict-v num ${live >= 0.95 ? 'good' : 'bad'}`;
-    const k = scaleForHoldRect(p, ppm, state.size, state.size, 0.95);
     $('liveNote').textContent = live >= 0.95
       ? `A ${state.size} px target holds this hand.`
-      : `Would need ${k === null ? 'more' : Math.round(state.size * k)} px for a 95% hold.`;
+      : `Would need ${needK ? Math.round(state.size * needK) : 'more'} px for a 95% hold.`;
   }
 
   if (state.playing) {
@@ -303,11 +312,18 @@ function renderSweep() {
     SIZES.map((s) => `<th scope="col">${s} px${s === 24 ? ' (AA)' : s === 44 ? ' (AAA)' : ''}</th>`).join('') +
     '<th scope="col">Needs, for 95%</th>';
 
+  const fam = state.current.path.family;
+  const worstAt = (ppm, px) => {
+    let w = Infinity;
+    for (const m of fam) { const h = holdFractionRect(m, ppm, px, px); if (h < w) w = h; }
+    return w;
+  };
+
   $('sweepBody').innerHTML = CPIS.map((cpi) => {
     const ppm = cpiToCssPxPerMm(cpi);
-    const k = scaleForHoldRect(p, ppm, WCAG_MIN_PX, WCAG_MIN_PX, 0.95);
+    const k = judgeRecording(fam, ppm).needPx;
     const cells = SIZES.map((s) => {
-      const v = holdFractionRect(p, ppm, s, s);
+      const v = worstAt(ppm, s);
       const cls = v >= 0.95 ? 'good' : v < 0.5 ? 'bad' : '';
       return `<td class="num ${cls}">${pct(v)}</td>`;
     }).join('');
@@ -354,7 +370,11 @@ function drawChart() {
     const ppm = cpiToCssPxPerMm(cpi);
     g.beginPath(); g.strokeStyle = colours[ci]; g.lineWidth = cpi === 800 ? 2.6 : 1.5;
     for (let s = 8; s <= maxSize; s += 3) {
-      const v = holdFractionRect(p, ppm, s, s);
+      let v = Infinity;
+      for (const m of state.current.path.family) {
+        const h = holdFractionRect(m, ppm, s, s);
+        if (h < v) v = h;
+      }
       s === 8 ? g.moveTo(X(s), Y(v)) : g.lineTo(X(s), Y(v));
     }
     g.stroke();
@@ -616,12 +636,16 @@ function runSelfTest() {
       if (getComputedStyle(el).display === 'inline') continue;   // the Inline exception
       const m = Math.min(r.width, r.height);
       if (m < smallest) { smallest = m; offender = el; }
-      if (holdFractionRect(state.current.path, ppm, r.width, r.height) >= 0.95) heldByHand++;
+      let w = Infinity;
+      for (const m of state.current.path.family) {
+        const h = holdFractionRect(m, ppm, r.width, r.height);
+        if (h < w) w = h;
+      }
+      if (w >= 0.95) heldByHand++;
     }
 
     const clearsAAA = smallest >= WCAG_ENHANCED_PX;
-    const k = scaleForHoldRect(state.current.path, ppm, WCAG_MIN_PX, WCAG_MIN_PX, 0.95);
-    const need = k === null ? null : Math.round(WCAG_MIN_PX * k);
+    const need = judgeRecording(state.current.path.family, ppm).needPx;
 
     $('selfTest').innerHTML =
       `Measured just now in your browser: <strong>${all.length}</strong> interactive controls. ` +

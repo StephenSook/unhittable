@@ -8,7 +8,7 @@
 import dns from 'node:dns/promises';
 import { collectTargets, TARGET_SELECTOR } from '@unhittable/core/probe.js';
 import { normaliseTargetUrl, assertFetchable } from '@unhittable/core/url-guard.js';
-import { evaluateSpacing, judgeElement, summarise, cpiToCssPxPerMm, azimuthFamily } from '@unhittable/core/geometry.js';
+import { judgePage, cpiToCssPxPerMm } from '@unhittable/core/geometry.js';
 import { recordingToPath } from '@unhittable/core/replay.js';
 import { createGuardProxy } from './guard-proxy.js';
 
@@ -234,37 +234,28 @@ export async function scanUrl({ browser, resolver = new ResolverCache(), guard =
 
   const pxPerMm = cpiToCssPxPerMm(cpi);
   const rects = probe.targets.map((t) => ({ x: t.x, y: t.y, w: t.w, h: t.h }));
-  const spacing = evaluateSpacing(rects);
 
-  // Plane projections are computed once per RECORDING, not per control, so a
-  // page with eight hundred targets stays fast. recordingToPath already built
-  // the family, because the plane a pointing device moves in is unknown and
-  // every figure is published across the whole set.
-  const family = opts.path.family?.length
-    ? opts.path.family
-    : azimuthFamily(opts.path, opts.azimuths ?? 12);
-
-  const elements = probe.targets.map((t, i) => {
-    const j = judgeElement(rects[i], spacing[i], family, pxPerMm, { want });
-    return {
-      tag: t.tag, type: t.type, role: t.role, name: t.name, selector: t.selector,
-      x: t.x, y: t.y, w: t.w, h: t.h,
-      inViewport: t.inViewport,
-      inlineExempt: t.inlineExempt,
-      nativeControl: t.nativeControl,
-      ...j,
-      // The Inline exception is the standard's, so it is applied to the
-      // standard's verdict and NOT to ours. A link in a sentence is exempt
-      // from the size rule; the hand still has to hit it.
-      wcagPass: j.wcagPass || t.inlineExempt,
-      wcagExemptReason: j.sizeOk ? null
-        : t.inlineExempt ? 'inline, in a sentence'
-        : (j.spacingApplies && j.spacingPass) ? 'undersized but adequately spaced'
-        : null,
-    };
+  // The plane family is built once per RECORDING, not per control. The
+  // Inline exception is the STANDARD's, so it is applied to the standard's
+  // verdict and deliberately not to ours: a link in a sentence is exempt from
+  // the size rule, and the hand still has to hit it.
+  const family = opts.path.family;
+  const judged = judgePage(rects, family, pxPerMm, {
+    want,
+    inlineExempt: probe.targets.map((t) => t.inlineExempt),
   });
 
-  const summary = summarise(elements, { want });
+  const elements = judged.elements.map((e, i) => ({
+    tag: probe.targets[i].tag, type: probe.targets[i].type, role: probe.targets[i].role,
+    name: probe.targets[i].name, selector: probe.targets[i].selector,
+    x: probe.targets[i].x, y: probe.targets[i].y,
+    w: probe.targets[i].w, h: probe.targets[i].h,
+    inViewport: probe.targets[i].inViewport,
+    nativeControl: probe.targets[i].nativeControl,
+    ...e,
+  }));
+
+  const summary = judged.summary;
   const undecidable = elements.filter((e) => !e.sizeOk && !e.wcagPass && e.nativeControl).length;
 
   // Reported as a page-level finding rather than folded into the element

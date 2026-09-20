@@ -50,6 +50,7 @@ for (const file of fs.readdirSync(DATA).filter((f) => f.endsWith('.txt') && f !=
     condition: CONDITIONS.get(subject) ?? null,
     samplingRateHz: 100,
     hz: +p.hz.toFixed(2),
+    sweptDeg: p.sweptDeg === null ? null : Math.round(p.sweptDeg),
     prominence: +p.prominence.toFixed(1),
     // Does this recording contain an oscillation a null draw could not fake?
     // Reported for every recording, including the ones where the answer is

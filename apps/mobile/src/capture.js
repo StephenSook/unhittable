@@ -59,7 +59,7 @@ export function record({ seconds = DURATION_S, onProgress } = {}) {
       if (timer) { clearInterval(timer); timer = null; }
     };
 
-    let sawRotation = false;
+    let rotationSamples = 0;
     sub = DeviceMotion.addListener((d) => {
       // accelerationIncludingGravity is the field present on every platform,
       // and it is the one we want: the attitude filter needs gravity in order
@@ -70,7 +70,7 @@ export function record({ seconds = DURATION_S, onProgress } = {}) {
       ax.push(a.x); ay.push(a.y); az.push(a.z ?? 0);
       // Platform-dependent axis mapping and degrees to radians, both
       // verified against the installed native source. See axes.js.
-      if (hasRotationRate(d.rotationRate)) sawRotation = true;
+      if (hasRotationRate(d.rotationRate)) rotationSamples++;
       const w = rotationRateToBodyAxes(d.rotationRate, Platform.OS);
       gx.push(w.x); gy.push(w.y); gz.push(w.z);
     });
@@ -86,8 +86,11 @@ export function record({ seconds = DURATION_S, onProgress } = {}) {
       if (elapsed >= seconds) {
         stop();
         if (t.length < 64) return reject(new Error(`Only ${t.length} samples arrived in ${seconds} seconds. The sensor is not delivering data.`));
-        const hasGyro = sawRotation;
-        resolve({ t, ax, ay, az, gx, gy, gz, hasGyro, seconds: elapsed });
+        // COVERAGE, not presence. One non-zero sample in a thousand is a
+        // mostly zero-filled stream, and zeros look to the filter exactly
+        // like a wrist that is not turning.
+        const gyroCoverage = t.length ? rotationSamples / t.length : 0;
+        resolve({ t, ax, ay, az, gx, gy, gz, gyroCoverage, hasGyro: gyroCoverage >= 0.8, seconds: elapsed });
       }
     }, 100);
   });
@@ -101,7 +104,7 @@ export function record({ seconds = DURATION_S, onProgress } = {}) {
  * figure downstream depends on it and reporting 100 Hz while receiving 47 is
  * the kind of error that produces a wrong frequency with no warning.
  */
-export function resample({ t, ax, ay, az, gx, gy, gz, hasGyro }) {
+export function resample({ t, ax, ay, az, gx, gy, gz, hasGyro, gyroCoverage }) {
   const n = t.length;
   const spanS = (t[n - 1] - t[0]) / 1000;
   if (!(spanS > 0)) throw new Error('The samples carry no elapsed time.');
@@ -137,6 +140,7 @@ export function resample({ t, ax, ay, az, gx, gy, gz, hasGyro }) {
     fs: gridHz,
     measuredHz,
     hasGyro: !!hasGyro,
+    gyroCoverage: gyroCoverage ?? 0,
     // Below twice the top of the tremor band, the measurement is not
     // trustworthy and the UI says so rather than printing a number.
     belowNyquist: gridHz < 24,
