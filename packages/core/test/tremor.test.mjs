@@ -150,3 +150,60 @@ test('tremorSpectrum returns the curve it took its peak from', () => {
     `the reported peak ${s.hz.toFixed(2)} Hz must coincide with the curve maximum ${peak.hz.toFixed(2)} Hz`);
   assert.ok(Math.abs(s.hz - f0) < 0.2, `recovered ${s.hz.toFixed(2)} Hz for a ${f0} Hz input`);
 });
+
+test('REGRESSION: recovered amplitude is FLAT across the record, not tapered', () => {
+  // The bug this pins: accelToDisplacement used to apply a Hann window before
+  // transforming and never removed it, so the recovered displacement carried
+  // the window's envelope. A true 2.000 mm amplitude read as 0.778 mm one
+  // fifth of the way into the record and 1.991 mm at the centre.
+  //
+  // Peak-to-peak barely moved, because the peak lands near the middle where
+  // the gain is 1. That is precisely why it survived review: the headline
+  // amplitude looked right. What it corrupted was the HOLD FRACTION, which
+  // integrates over the whole retained record and was therefore reported as
+  // more generous than the truth.
+  //
+  // So this test asserts FLATNESS, not peak-to-peak. Peak-to-peak cannot see
+  // this defect and an assertion on it would have passed throughout.
+  const fs = 100, n = 1024, f0 = 5.0, A = 2.0;           // 2 mm amplitude, 4 mm p2p
+  const w = 2 * Math.PI * f0;
+  const accelG = Float64Array.from({ length: n },
+    (_, i) => -(w * w) * A * Math.sin((w * i) / fs) / 1000 / 9.80665);
+
+  const d = accelGToDisplacementMm(accelG, fs, { loHz: 3, hiHz: 12 });
+
+  const localAmplitude = (centreFraction) => {
+    const i = Math.floor(n * centreFraction);
+    const seg = d.slice(i - 25, i + 25);
+    let lo = Infinity, hi = -Infinity;
+    for (const v of seg) { if (v < lo) lo = v; if (v > hi) hi = v; }
+    return (hi - lo) / 2;
+  };
+
+  // Across the portion recordingToPath actually keeps, every local amplitude
+  // must be the true one. The windowed version failed the first of these by a
+  // factor of nearly three.
+  const samples = [0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80].map(localAmplitude);
+  for (const [i, a] of samples.entries()) {
+    assert.ok(Math.abs(a - A) / A < 0.05,
+      `local amplitude ${a.toFixed(3)} mm at position ${[0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80][i]} ` +
+      `differs from the true ${A} mm by more than 5%, which means an envelope is present`);
+  }
+
+  // And the flatness itself: the ends of the retained window must match its
+  // middle. Under the Hann bug this ratio was about 0.39.
+  const ratio = Math.min(samples[0], samples[6]) / samples[3];
+  assert.ok(ratio > 0.95, `the retained record is tapered: edge/centre amplitude ratio is ${ratio.toFixed(3)}`);
+});
+
+test('the spectrum path KEEPS its window, because that is the correct choice there', () => {
+  // The fix above must not be over-applied. A taper trades resolution for
+  // leakage, and neither affects where a peak sits, so windowing is right for
+  // spectral estimation and wrong only for amplitude reconstruction.
+  const fs = 100, n = 1024;
+  const x = Float64Array.from({ length: n },
+    (_, i) => 0.05 * Math.sin(2 * Math.PI * 5 * i / fs) + 0.004 * Math.sin(2 * Math.PI * 9 * i / fs));
+  const s = tremorSpectrum(x, fs, { loHz: 2, hiHz: 15 });
+  assert.ok(Math.abs(s.hz - 5) < 0.2, `the dominant tone must still be found at 5 Hz, got ${s.hz.toFixed(2)}`);
+  assert.ok(s.prominence > 5, 'and it must still stand clear of the floor');
+});

@@ -65,9 +65,26 @@ export function accelToDisplacement(accel, fs, { loHz = 3, hiHz = 12 } = {}) {
   const re = new Float64Array(nfft);
   const im = new Float64Array(nfft);
 
-  // Taper before transforming so the record's own ends do not ring.
-  const win = hann(detrend(accel, Math.min(n - 1, 201)));
-  re.set(win);
+  // NO WINDOW HERE, deliberately, and this is the subtle part.
+  //
+  // A Hann taper is the right thing for estimating a SPECTRUM, because it
+  // trades resolution for leakage and neither of those affects where a peak
+  // sits. It is the wrong thing for reconstructing an AMPLITUDE, because the
+  // taper multiplies the signal by an envelope that is never removed. An
+  // earlier version windowed here, and the recovered displacement then had
+  // the Hann shape baked into it: a true 2.000 mm amplitude read as 0.778 mm
+  // one fifth of the way into the record and 1.991 mm at the centre.
+  //
+  // Peak-to-peak survived that almost intact, because the peak lands near the
+  // middle where the gain is 1, which is exactly why it went unnoticed. The
+  // HOLD FRACTION did not: most of the evaluated record had been pulled
+  // toward the centre of the target, so every published hold rate was too
+  // generous and the finding looked weaker than it is.
+  //
+  // Zeroing the out-of-band bins is itself a filter, so the broadband
+  // discontinuity at the record's wrap point is largely removed, and the
+  // caller discards the first and last fifth where the remainder lands.
+  re.set(detrend(accel, Math.min(n - 1, 201)));
 
   fft(re, im);
 
