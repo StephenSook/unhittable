@@ -505,7 +505,7 @@ function renderScan(d) {
         <caption class="vh">Every interactive control on the page, worst first</caption>
         <thead><tr>
           <th scope="col">Control</th><th scope="col">Size</th><th scope="col">WCAG 2.5.8</th>
-          <th scope="col">Chance a click lands</th><th scope="col">Limited by</th><th scope="col">Would need</th>
+          <th scope="col">Chance a click lands</th><th scope="col">Bound by</th><th scope="col">Would need</th>
         </tr></thead>
         <tbody id="elBody"></tbody>
       </table>
@@ -529,7 +529,7 @@ function renderScan(d) {
         <td class="num">${Math.round(e.w)}&times;${Math.round(e.h)}</td>
         <td>${badge}</td>
         <td><div class="holdbar"><div class="holdbar-track"><div class="holdbar-fill" style="width:${(e.hold * 100).toFixed(1)}%;background:${colour}"></div></div><span class="num">${pct(e.hold)}</span></div></td>
-        <td class="num">${e.limitingAxis === 'y' ? 'height' : e.limitingAxis === 'x' ? 'width' : '·'}</td>
+        <td class="num">${e.bindingSide ?? '\u00b7'}</td>
         <td class="num">${e.needWPx ? `${Math.round(e.needWPx)}&times;${Math.round(e.needHPx)}` : '·'}</td>
       </tr>`;
     }).join('') || '<tr><td colspan="6" style="color:var(--dim)">Nothing in this category.</td></tr>';

@@ -8,7 +8,7 @@
 import dns from 'node:dns/promises';
 import { collectTargets, TARGET_SELECTOR } from '@unhittable/core/probe.js';
 import { normaliseTargetUrl, assertFetchable } from '@unhittable/core/url-guard.js';
-import { evaluateSpacing, judgeElement, summarise, cpiToCssPxPerMm } from '@unhittable/core/geometry.js';
+import { evaluateSpacing, judgeElement, summarise, cpiToCssPxPerMm, azimuthFamily } from '@unhittable/core/geometry.js';
 import { recordingToPath } from '@unhittable/core/replay.js';
 import { createGuardProxy } from './guard-proxy.js';
 
@@ -225,8 +225,12 @@ export async function scanUrl({ browser, resolver = new ResolverCache(), guard =
   const rects = probe.targets.map((t) => ({ x: t.x, y: t.y, w: t.w, h: t.h }));
   const spacing = evaluateSpacing(rects);
 
+  // Rotations are computed once for the page rather than once per control,
+  // so a page with eight hundred targets stays fast.
+  const family = azimuthFamily(opts.path, opts.azimuths ?? 12);
+
   const elements = probe.targets.map((t, i) => {
-    const j = judgeElement(rects[i], spacing[i], opts.path, pxPerMm, { want });
+    const j = judgeElement(rects[i], spacing[i], family, pxPerMm, { want });
     return {
       tag: t.tag, type: t.type, role: t.role, name: t.name, selector: t.selector,
       x: t.x, y: t.y, w: t.w, h: t.h,

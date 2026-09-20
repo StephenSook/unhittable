@@ -12,7 +12,7 @@ We replayed **clinically recorded tremor** against it.
 
 ```
 38 live sites          3,881 interactive controls measured as rendered
-95.9% pass WCAG 2.5.8  73.9% of them cannot be reliably held
+95.9% pass WCAG 2.5.8  74.1% of them cannot be reliably held
                        by a MEDIAN clinically recorded tremor
 ```
 
@@ -48,8 +48,8 @@ Paste a URL into the live page and it will do this to your site in about three s
 | Still under 95% at the 44 px AAA size | **29 of 52** |
 
 Across the 38-site corpus the median interactive control is **141 × 30 px**. It passes.
-Height is the limiting axis on **3,341** controls and width on **one**, because the
-real web is made of wide short buttons and a square minimum structurally cannot
+It is bound by its **height** on 3,374 controls against 247 bound by width, because
+the real web is made of wide short buttons and a square minimum structurally cannot
 describe the shape that fails.
 
 The corpus is judged against the **median** of the 52 detected tremors, not the
@@ -85,6 +85,12 @@ everyone.
 
 - **We do not diagnose anyone.** Condition labels are reproduced verbatim from the
   dataset. Nothing here infers one.
+- **The published hold is the WORST azimuth.** Gravity fixes the vertical of our
+  recovered frame; nothing fixes its heading, because the dataset has no
+  magnetometer. A single reading therefore depends on a choice with no physical
+  meaning, and on a wide short control the two ends of that choice differ by up to
+  36 points. Every figure here is the floor across 12 azimuths. The finding barely
+  moves under it, which is the point of checking.
 - **Wrist rotation is removed, and it had to be.** An accelerometer reads gravity
   projected onto its own axes, so a wrist turning in place fabricates apparent
   movement: 1.75 mm for a five degree oscillation, larger than our median. The

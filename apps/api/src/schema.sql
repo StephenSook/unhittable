@@ -58,10 +58,13 @@ CREATE TABLE IF NOT EXISTS elements (
   size_ok       BOOLEAN NOT NULL,
   wcag_pass     BOOLEAN NOT NULL,
   inline_exempt BOOLEAN NOT NULL DEFAULT FALSE,
+  -- hold is the WORST azimuth, because the recovered horizontal frame has an
+  -- arbitrary heading. hold_best and hold_spread publish how much that
+  -- unknowable rotation is worth rather than hiding it inside one number.
   hold          DOUBLE PRECISION NOT NULL,
-  hold_x        DOUBLE PRECISION NOT NULL,
-  hold_y        DOUBLE PRECISION NOT NULL,
-  limiting_axis TEXT,
+  hold_best     DOUBLE PRECISION NOT NULL,
+  hold_spread   DOUBLE PRECISION NOT NULL,
+  binding_side  TEXT,   -- 'width' or 'height': a property of the ELEMENT
   need_w        DOUBLE PRECISION,
   need_h        DOUBLE PRECISION,
   standard_not_hand BOOLEAN NOT NULL

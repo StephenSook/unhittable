@@ -7,7 +7,7 @@
 // check: if a code change alters a published number, this says so in seconds.
 
 import { recordingToPath } from '../packages/core/src/replay.js';
-import { evaluateSpacing, judgeElement, summarise, cpiToCssPxPerMm } from '../packages/core/src/geometry.js';
+import { evaluateSpacing, judgeElement, summarise, cpiToCssPxPerMm, azimuthFamily } from '../packages/core/src/geometry.js';
 import { getRecording, DEFAULT_RECORDING } from '../apps/api/src/recordings.js';
 import * as db from '../apps/api/src/db.js';
 
@@ -27,10 +27,11 @@ for (const row of rows) {
   const rects = report.elements.map((e) => ({ x: e.x, y: e.y, w: e.w, h: e.h }));
   const spacing = evaluateSpacing(rects);
   const ppm = cpiToCssPxPerMm(row.cpi);
+  const family = azimuthFamily(rec.path, 12);
 
   const before = report.summary.passesStandardButNotHand;
   report.elements = report.elements.map((e, i) => {
-    const j = judgeElement(rects[i], spacing[i], rec.path, ppm, { want: row.want });
+    const j = judgeElement(rects[i], spacing[i], family, ppm, { want: row.want });
     return {
       ...e, ...j,
       wcagPass: j.wcagPass || e.inlineExempt,
@@ -57,11 +58,11 @@ for (const row of rows) {
       values.push(`(${Array.from({ length: cols }, (_, k) => `$${b + k + 1}`).join(',')})`);
       params.push(row.id, e.tag ?? null, e.role ?? null, (e.name ?? '').slice(0, 300),
         (e.selector ?? '').slice(0, 500), e.w, e.h, e.sizeOk, e.wcagPass, !!e.inlineExempt,
-        e.hold, e.holdX, e.holdY, e.limitingAxis ?? null, e.passesStandardButNotHand);
+        e.hold, e.holdBest ?? e.hold, e.holdSpread ?? 0, e.bindingSide ?? null, e.passesStandardButNotHand);
     });
     await pool.query(
       `INSERT INTO elements (scan_id, tag, role, name, selector, w, h, size_ok, wcag_pass,
-        inline_exempt, hold, hold_x, hold_y, limiting_axis, standard_not_hand)
+        inline_exempt, hold, hold_best, hold_spread, binding_side, standard_not_hand)
        VALUES ${values.join(',')}`, params);
   }
 }

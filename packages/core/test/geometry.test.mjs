@@ -11,6 +11,7 @@ import {
   cpiToCssPxPerMm, holdFractionRect, axisHoldFraction, minimumBox,
   scaleForHoldRect, circleIntersectsRect, circlesIntersect, meetsSizeMinimum,
   evaluateSpacing, judgeElement, summarise, holdSquare,
+  rotatePath, holdOverAzimuths, extentOverAzimuths, bindingSide,
 } from '../src/geometry.js';
 import { recordingToPath, holdFraction, cpiToPxPerMm } from '../src/replay.js';
 
@@ -164,16 +165,21 @@ test('the joint hold can never exceed either marginal hold', () => {
   }
 });
 
-test('REAL DATA: a wide short button fails on its short axis', () => {
+test('REAL DATA: a wide short button is bound by its short side', () => {
   // The shape a square minimum cannot describe. 180x20 is an ordinary primary
-  // button. It is generous horizontally and too short vertically, and the
-  // report has to say which.
+  // button, generous on one axis and too short on the other.
+  //
+  // The side named is the ELEMENT's, not a tremor axis. Our horizontal frame
+  // has an arbitrary azimuth, so naming a tremor axis would have reported a
+  // fact about a coordinate choice rather than about the button.
   const ppm = cpiToPxPerMm(800);
   const wide = { x: 0, y: 0, w: 180, h: 20 };
   const j = judgeElement(wide, { spacingApplies: false, spacingPass: true }, path, ppm);
-  assert.ok(j.holdX > j.holdY, 'the long axis must be the easier one');
-  assert.equal(j.limitingAxis, 'y');
+  assert.equal(j.bindingSide, 'height', '20 px tall against 180 wide: height binds');
   assert.equal(j.sizeOk, false, '20 px tall is under the 24 px minimum');
+  assert.ok(j.hold <= j.holdBest, 'the published hold is the floor of the azimuth range');
+  // The marginal per-axis figures still exist for the method write-up.
+  assert.ok(axisHoldFraction(path, ppm, 180, 'x') >= axisHoldFraction(path, ppm, 20, 'y'));
 });
 
 test('axis hold rises with extent and reaches one when the axis is huge', () => {
@@ -261,4 +267,75 @@ test('holdFractionRect refuses a non-positive extent', () => {
   assert.throws(() => holdFractionRect(path, 1, 0, 10), /positive/);
   assert.throws(() => holdFractionRect(path, 1, 10, -1), /positive/);
   assert.throws(() => axisHoldFraction(path, 1, 0), /positive/);
+});
+
+test('rotating the path does not change a SQUARE target\'s hold', () => {
+  // The invariance that must hold, and the reason a square target was never
+  // affected by the arbitrary azimuth.
+  const ppm = cpiToPxPerMm(800);
+  const base = holdFractionRect(path, ppm, 64, 64);
+  for (const deg of [15, 30, 45, 90, 137]) {
+    const r = rotatePath(path, (deg * Math.PI) / 180);
+    assert.ok(Math.abs(holdFractionRect(r, ppm, 64, 64) - base) < 0.06,
+      `a square target should be nearly azimuth independent, moved by more than 6 points at ${deg} degrees`);
+  }
+});
+
+test('rotating the path DOES change a wide short target, which is why azimuth matters', () => {
+  // Built rather than borrowed, because how anisotropic a given patient's
+  // tremor happens to be is not the point. The point is that the MECHANISM
+  // exists, so a single arbitrary azimuth cannot be published as fact.
+  //
+  // Measured across the shipped recordings this is worth up to 36 points of
+  // hold on a 141 by 30 control, including on the one the corpus uses.
+  const n = 900;
+  const x = new Float64Array(n), y = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    const t = (2 * Math.PI * 5 * i) / 100;
+    x[i] = 3.0 * Math.sin(t);          // 6 mm of travel one way
+    y[i] = 0.12 * Math.sin(t * 1.7);   // almost none the other
+  }
+  const anisotropic = { x, y, n, fs: 100, seconds: n / 100 };
+  const ppm = cpiToPxPerMm(800);
+
+  const along = holdFractionRect(anisotropic, ppm, 200, 20);
+  const across = holdFractionRect(rotatePath(anisotropic, Math.PI / 2), ppm, 200, 20);
+  assert.ok(Math.abs(along - across) > 0.2,
+    `a strongly anisotropic tremor must care which way it runs: ${along.toFixed(3)} vs ${across.toFixed(3)}`);
+
+  const o = holdOverAzimuths(anisotropic, ppm, 200, 20);
+  assert.ok(o.spread > 0.2, 'and the azimuth sweep must see that spread');
+  assert.ok(o.worst <= Math.min(along, across) + 1e-9, 'the floor must be at or below both readings');
+});
+
+test('holdOverAzimuths brackets the arbitrary choice, and the worst is the floor', () => {
+  const ppm = cpiToPxPerMm(800);
+  const o = holdOverAzimuths(path, ppm, 200, 20);
+  assert.ok(o.worst <= o.median && o.median <= o.best);
+  const single = holdFractionRect(path, ppm, 200, 20);
+  assert.ok(o.worst <= single + 1e-12, 'the published floor must not exceed the arbitrary single reading');
+  assert.ok(o.best >= single - 1e-12);
+  assert.ok(o.spread >= 0);
+});
+
+test('extentOverAzimuths is invariant to rotation, unlike max of the two axes', () => {
+  const e0 = extentOverAzimuths(path);
+  for (const deg of [23, 61, 90, 154]) {
+    const e = extentOverAzimuths(rotatePath(path, (deg * Math.PI) / 180));
+    assert.ok(Math.abs(e - e0) / e0 < 0.02, `extent moved by more than 2% at ${deg} degrees`);
+  }
+  // And it is at least as large as either single-axis reading, since those
+  // are projections of it.
+  let lx = Infinity, hx = -Infinity, ly = Infinity, hy = -Infinity;
+  for (let i = 0; i < path.n; i++) {
+    if (path.x[i] < lx) lx = path.x[i]; if (path.x[i] > hx) hx = path.x[i];
+    if (path.y[i] < ly) ly = path.y[i]; if (path.y[i] > hy) hy = path.y[i];
+  }
+  assert.ok(e0 >= Math.max(hx - lx, hy - ly) - 1e-9);
+});
+
+test('bindingSide names a property of the element, not of the tremor', () => {
+  assert.equal(bindingSide({ w: 200, h: 20 }), 'height');
+  assert.equal(bindingSide({ w: 20, h: 200 }), 'width');
+  assert.equal(bindingSide({ w: 44, h: 44 }), null);
 });

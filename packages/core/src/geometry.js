@@ -178,20 +178,115 @@ export function evaluateSpacing(rects, { min = WCAG_MIN_PX } = {}) {
   });
 }
 
+// ---------------------------------------------------------------------------
+// ROTATION INVARIANCE.
+//
+// The world frame recovered in attitude.js has a well-determined vertical,
+// because gravity supplies it, and an ARBITRARY azimuth, because recovering
+// compass heading would need a magnetometer the dataset does not carry. So
+// the horizontal PLANE is real, and the split of a tremor between "x" and "y"
+// inside that plane is not.
+//
+// That matters here and nowhere else in the project. A square target does not
+// care. A 141 by 30 button cares a great deal, and an earlier version of the
+// report named the limiting axis as "width" or "height" using coordinates
+// that a different arbitrary rotation would have swapped.
+//
+// Two honest replacements:
+//
+//   - Hold on a rectangle is evaluated over many azimuths and the WORST is
+//     published. An accessibility floor should assume the unlucky alignment,
+//     and unlike a single arbitrary choice it is a quantity that does not move
+//     when the frame does.
+//   - The axis that gets named is a property of the ELEMENT, its short side,
+//     which is well defined no matter how the tremor is oriented.
+// ---------------------------------------------------------------------------
+
+/** Rotate a path in the horizontal plane. Cheap: two multiplies per sample. */
+export function rotatePath(path, radians) {
+  const c = Math.cos(radians), s = Math.sin(radians);
+  const x = new Float64Array(path.n), y = new Float64Array(path.n);
+  for (let i = 0; i < path.n; i++) {
+    x[i] = path.x[i] * c - path.y[i] * s;
+    y[i] = path.x[i] * s + path.y[i] * c;
+  }
+  return { ...path, x, y };
+}
+
+/**
+ * Hold over every azimuth, since we cannot know which one is real.
+ *
+ * Returns the worst, the best and the median. The worst is what the report
+ * leads with: it is the conservative reading and it is invariant to the
+ * arbitrary choice our frame happens to have made.
+ */
+export function holdOverAzimuths(path, pxPerMm, wPx, hPx, steps = 36) {
+  const holds = [];
+  for (let k = 0; k < steps; k++) {
+    holds.push(holdFractionRect(rotatePath(path, (Math.PI * k) / steps), pxPerMm, wPx, hPx));
+  }
+  holds.sort((a, b) => a - b);
+  return {
+    worst: holds[0],
+    best: holds[holds.length - 1],
+    median: holds[Math.floor(holds.length / 2)],
+    spread: holds[holds.length - 1] - holds[0],
+  };
+}
+
+/**
+ * The largest peak-to-peak extent in ANY direction.
+ *
+ * max(p2p(x), p2p(y)) is not rotation invariant, so it reports a different
+ * amplitude for the same hand depending on an arbitrary choice. This does not.
+ */
+export function extentOverAzimuths(path, steps = 36) {
+  let worst = 0;
+  for (let k = 0; k < steps; k++) {
+    const r = rotatePath(path, (Math.PI * k) / steps);
+    let lo = Infinity, hi = -Infinity;
+    for (let i = 0; i < r.n; i++) { if (r.x[i] < lo) lo = r.x[i]; if (r.x[i] > hi) hi = r.x[i]; }
+    if (hi - lo > worst) worst = hi - lo;
+  }
+  return worst;
+}
+
+/** Which side of the ELEMENT is the binding constraint. A property of the box. */
+export function bindingSide(rect) {
+  if (rect.w === rect.h) return null;
+  return rect.w < rect.h ? 'width' : 'height';
+}
+
 /**
  * The full verdict for one element: what the standard says, and what the
  * recorded hand says. These are deliberately separate fields. We are not
  * redefining conformance and we do not want to be read as doing so. The
  * standard's own answer is reported first and unmodified; ours sits beside it.
  */
-export function judgeElement(rect, spacing, path, pxPerMm, { want = 0.95 } = {}) {
+export function judgeElement(rect, spacing, pathOrPaths, pxPerMm, { want = 0.95 } = {}) {
   const sizeOk = meetsSizeMinimum(rect);
   const wcagPass = sizeOk || (spacing.spacingApplies && spacing.spacingPass);
 
-  const hold = holdFractionRect(path, pxPerMm, rect.w, rect.h);
-  const holdX = axisHoldFraction(path, pxPerMm, rect.w, 'x');
-  const holdY = axisHoldFraction(path, pxPerMm, rect.h, 'y');
-  const scale = scaleForHoldRect(path, pxPerMm, rect.w, rect.h, want);
+  // The caller may pass a pre-rotated family of paths, which is how a scan of
+  // eight hundred controls stays fast: the rotations are computed once for
+  // the page rather than once per element.
+  const paths = Array.isArray(pathOrPaths) ? pathOrPaths : [pathOrPaths];
+
+  let worst = Infinity, best = -Infinity, worstPath = paths[0];
+  for (const p of paths) {
+    const h = holdFractionRect(p, pxPerMm, rect.w, rect.h);
+    if (h < worst) { worst = h; worstPath = p; }
+    if (h > best) best = h;
+  }
+
+  // The PUBLISHED hold is the worst azimuth. Our world frame has a
+  // well-determined vertical, from gravity, and an arbitrary rotation about
+  // it, because no magnetometer is available to fix a heading. A single
+  // reading therefore depends on a choice that carries no physical meaning,
+  // and for a wide short control the two ends of that choice can differ by
+  // thirty points. An accessibility floor takes the unlucky alignment.
+  const hold = worst;
+  const scale = scaleForHoldRect(worstPath, pxPerMm, rect.w, rect.h, want);
 
   return {
     wPx: rect.w,
@@ -201,17 +296,31 @@ export function judgeElement(rect, spacing, path, pxPerMm, { want = 0.95 } = {})
     spacingPass: spacing.spacingPass,
     wcagPass,
     hold,
-    holdX,
-    holdY,
-    // Which axis is doing the damage. Null when neither is the obvious culprit.
-    limitingAxis: holdX === holdY ? null : (holdX < holdY ? 'x' : 'y'),
+    holdBest: best,
+    // How much the unknowable azimuth is worth on this control, published so
+    // the uncertainty is visible instead of hidden inside a single number.
+    holdSpread: best - worst,
+    // The side that binds is a property of the ELEMENT, so it survives any
+    // rotation of the tremor. An earlier version named a tremor axis instead,
+    // which a different arbitrary frame would have swapped.
+    bindingSide: bindingSide(rect),
     scaleNeeded: scale,
     needWPx: scale === null ? null : rect.w * scale,
     needHPx: scale === null ? null : rect.h * scale,
-    // The case this project exists to surface: the standard is satisfied and
-    // the hand still cannot hold it.
     passesStandardButNotHand: wcagPass && hold < want,
   };
+}
+
+/**
+ * The rotation family a scan judges against. Computed once per page.
+ * `steps` of 1 means "do not consider azimuth", which is only correct when
+ * the frame's heading is actually known.
+ */
+export function azimuthFamily(path, steps = 12) {
+  if (steps <= 1) return [path];
+  const out = [];
+  for (let k = 0; k < steps; k++) out.push(rotatePath(path, (Math.PI * k) / steps));
+  return out;
 }
 
 /** Roll a page's per-element verdicts into the numbers a report leads with. */
@@ -237,3 +346,4 @@ export function summarise(judged, { want = 0.95 } = {}) {
 export function holdSquare(path, pxPerMm, sizePx) {
   return holdFraction(path, pxPerMm, sizePx);
 }
+

@@ -136,11 +136,14 @@ test('THE FINDING: a target can pass the standard and fail the hand', async () =
   assert.ok(r.summary.passesStandardButNotHand >= 1);
 });
 
-test('the limiting axis is named for a wide short button', async () => {
+test('the binding side is named, and it is a fact about the element', async () => {
   const r = await scan();
   const wide = r.elements.find((e) => e.selector.includes('#wide'));
-  assert.equal(wide.limitingAxis, 'y', '200 wide by 20 tall fails vertically');
-  assert.ok(wide.holdX > wide.holdY);
+  assert.equal(wide.bindingSide, 'height', '200 wide by 20 tall is bound by its height');
+  // The published hold is the floor across azimuths, because the horizontal
+  // frame's heading is not recoverable without a magnetometer.
+  assert.ok(wide.hold <= wide.holdBest);
+  assert.ok(wide.holdSpread >= 0);
   // Aspect ratio is preserved by the recommendation.
   assert.ok(Math.abs(wide.needWPx / wide.needHPx - 200 / 20) < 1e-6);
 });

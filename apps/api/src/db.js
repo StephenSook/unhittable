@@ -94,15 +94,15 @@ export async function saveScan(pool, report, { recordingId, inCorpus = false }) 
         const b = i * cols;
         values.push(`($${b + 1},$${b + 2},$${b + 3},$${b + 4},$${b + 5},$${b + 6},$${b + 7},$${b + 8},$${b + 9},$${b + 10},$${b + 11},$${b + 12},$${b + 13},$${b + 14},$${b + 15})`);
         params.push(scanId, e.tag ?? null, e.role ?? null, (e.name ?? '').slice(0, 300), (e.selector ?? '').slice(0, 500),
-          e.w, e.h, e.sizeOk, e.wcagPass, !!e.inlineExempt, e.hold, e.holdX, e.holdY,
-          e.limitingAxis ?? null, e.passesStandardButNotHand);
+          e.w, e.h, e.sizeOk, e.wcagPass, !!e.inlineExempt, e.hold, e.holdBest ?? e.hold, e.holdSpread ?? 0,
+          e.bindingSide ?? null, e.passesStandardButNotHand);
       });
       // need_w / need_h are omitted from the bulk insert on purpose: they are
       // recomputable from the report and keeping the row narrow keeps a large
       // page's insert inside one statement.
       await client.query(
         `INSERT INTO elements (scan_id, tag, role, name, selector, w, h, size_ok, wcag_pass,
-            inline_exempt, hold, hold_x, hold_y, limiting_axis, standard_not_hand)
+            inline_exempt, hold, hold_best, hold_spread, binding_side, standard_not_hand)
          VALUES ${values.join(',')}`,
         params,
       );
@@ -134,8 +134,9 @@ export async function corpusSummary(pool) {
       count(*) FILTER (WHERE e.standard_not_hand)              AS pass_standard_fail_hand,
       count(*) FILTER (WHERE e.hold < 0.95)                    AS below_95,
       count(*) FILTER (WHERE e.hold < 0.5)                     AS below_50,
-      count(*) FILTER (WHERE e.limiting_axis = 'y')            AS limited_by_height,
-      count(*) FILTER (WHERE e.limiting_axis = 'x')            AS limited_by_width,
+      count(*) FILTER (WHERE e.binding_side = 'height')        AS limited_by_height,
+      count(*) FILTER (WHERE e.binding_side = 'width')         AS limited_by_width,
+      avg(e.hold_spread)                                       AS mean_hold_spread,
       percentile_cont(0.5) WITHIN GROUP (ORDER BY e.hold)      AS median_hold,
       percentile_cont(0.5) WITHIN GROUP (ORDER BY e.w)         AS median_w,
       percentile_cont(0.5) WITHIN GROUP (ORDER BY e.h)         AS median_h,
