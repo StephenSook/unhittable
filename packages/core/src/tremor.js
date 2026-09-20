@@ -96,14 +96,47 @@ export function accelToDisplacement(accel, fs, { loHz = 3, hiHz = 12 } = {}) {
   fft(re, im);
 
   const df = fs / nfft;
+
+  // The band edges are TAPERED, not square.
+  //
+  // Zeroing bins abruptly is a brick-wall filter, and a brick wall rings. A
+  // tone sitting near the cutoff comes back with that ringing added to it: at
+  // 7.87 Hz against an 8 Hz edge, a true 4.000 mm peak-to-peak was recovered
+  // as 4.663 mm, a 16.6 percent OVER-estimate. Over-estimating is the unsafe
+  // direction here, because it inflates our own finding, and our detected
+  // tremors run right up to 8 Hz.
+  //
+  // A raised-cosine transition over a fraction of the band removes it. This is
+  // the standard reason filters are not built with square edges, and the
+  // earlier validator missed it by testing only frequencies away from the
+  // cutoff.
+  const taper = Math.max(0.35, (hiHz - loHz) * 0.18);
+
+  // The integration divides by (2*pi*f)^2, so the DC bin and anything close to
+  // it blow up. The brick wall used to zero them as a side effect of zeroing
+  // everything below the cutoff; a taper does not, and for a band whose
+  // transition reaches below zero it let DC straight through with infinite
+  // gain and returned NaN for the whole record. A floor is therefore explicit
+  // rather than incidental.
+  const FLOOR_HZ = Math.max(df, 0.5);
+
+  const ramp = (f) => {
+    if (f < FLOOR_HZ) return 0;
+    if (f <= loHz - taper || f >= hiHz + taper) return 0;
+    if (f >= loHz && f <= hiHz) return 1;
+    const d = f < loHz ? (f - (loHz - taper)) / taper : ((hiHz + taper) - f) / taper;
+    return 0.5 * (1 - Math.cos(Math.PI * d));
+  };
+
   for (let k = 0; k < nfft; k++) {
     // Real input, so bin k and bin nfft-k are conjugates; fold to a frequency.
     const f = (k <= nfft / 2 ? k : nfft - k) * df;
-    if (f < loHz || f > hiHz) { re[k] = 0; im[k] = 0; continue; }
+    const g = ramp(f);
+    if (g === 0) { re[k] = 0; im[k] = 0; continue; }
     const w = 2 * Math.PI * f;
-    const s = -1 / (w * w);
-    re[k] *= s;
-    im[k] *= s;
+    const scale = (-1 / (w * w)) * g;
+    re[k] *= scale;
+    im[k] *= scale;
   }
 
   ifft(re, im);

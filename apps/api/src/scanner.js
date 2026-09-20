@@ -107,7 +107,18 @@ export async function scanUrl({ browser, resolver = new ResolverCache(), guard =
   // cannot be the SSRF boundary on its own: it approves a request and then
   // lets the browser resolve the name again, which is a rebinding window.
   // The proxy resolves once and connects to the address it validated.
+  //
+  // This is REQUIRED rather than optional. It used to default to null, and
+  // the corpus seeder simply never passed it, so the sweep that produces our
+  // published numbers ran with the rebinding gap wide open on every page and
+  // subresource. An option that defaults to unsafe is a vulnerability with a
+  // configuration flag in front of it.
   const proxyUrl = opts.proxyUrl ?? null;
+  if (!proxyUrl && !opts.unsafeNoProxy) {
+    throw new Error(
+      'scanUrl: a connection fence is required. Pass proxyUrl from createGuardProxy(), ' +
+      'or unsafeNoProxy: true if you are a test scanning a local fixture.');
+  }
 
   const context = await browser.newContext({
     ...(proxyUrl ? { proxy: { server: proxyUrl } } : {}),

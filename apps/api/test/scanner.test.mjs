@@ -57,8 +57,12 @@ after(async () => {
   await new Promise((r) => server.close(r));
 });
 
+// These tests scan a loopback fixture, so they relax both fences explicitly.
+// The two tests at the end of this file prove the shipped defaults refuse
+// exactly what is relaxed here.
 const scan = (opts = {}) =>
-  scanUrl({ browser, guard: openFence }, { url: base + (opts.p ?? '/'), path: tremor, ...opts });
+  scanUrl({ browser, guard: openFence },
+    { url: base + (opts.p ?? '/'), path: tremor, unsafeNoProxy: true, ...opts });
 
 test('the scanner loads a real page and reports the page it loaded', async () => {
   const r = await scan();
@@ -216,7 +220,7 @@ test('the scanner identifies itself honestly in its User-Agent', async () => {
   });
   await new Promise((r) => s.listen(0, '127.0.0.1', r));
   await scanUrl({ browser, guard: openFence },
-    { url: `http://127.0.0.1:${s.address().port}/`, path: tremor });
+    { url: `http://127.0.0.1:${s.address().port}/`, path: tremor, unsafeNoProxy: true });
   await new Promise((r) => s.close(r));
   assert.ok(seen.length > 0 && /Unhittable/.test(seen[0]), 'the site owner can see who we are in their logs');
 });
@@ -226,13 +230,23 @@ test('THE FENCE IS ON BY DEFAULT: no injected guard means loopback is refused', 
   // relaxation is not the default, which is the only reason the relaxation is
   // acceptable at all.
   await assert.rejects(
-    scanUrl({ browser }, { url: base + '/', path: tremor }),
+    scanUrl({ browser }, { url: base + '/', path: tremor, unsafeNoProxy: true }),
     /loopback/,
     'the deployed default must refuse to scan a private address',
   );
   await assert.rejects(
-    scanUrl({ browser }, { url: 'http://169.254.169.254/latest/meta-data/', path: tremor }),
+    scanUrl({ browser }, { url: 'http://169.254.169.254/latest/meta-data/', path: tremor, unsafeNoProxy: true }),
     /metadata|link-local/,
+  );
+});
+
+test('THE CONNECTION FENCE IS MANDATORY: no proxy means no scan', async () => {
+  // It used to default to null, and the corpus seeder never passed one, so
+  // the sweep producing our published numbers ran with the rebinding gap open.
+  await assert.rejects(
+    scanUrl({ browser, guard: openFence }, { url: base + '/', path: tremor }),
+    /a connection fence is required/,
+    'a caller that forgets the fence must fail loudly rather than scan unfenced',
   );
 });
 

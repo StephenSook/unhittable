@@ -72,23 +72,31 @@ test('a constant acceleration offset does NOT become a runaway drift', () => {
 });
 
 test('out-of-band motion is rejected, in-band motion is kept', () => {
+  // The drift sits at 1.2 Hz: above the 0.5 Hz floor that keeps DC out of the
+  // integration, and below the 3 Hz band edge. An earlier version used 0.4 Hz,
+  // which the floor now removes from BOTH bands, so the comparison measured
+  // leakage rather than the band limit and the arbitrary 3x threshold became
+  // meaningless.
   const fs = 100, n = 2048;
-  const w1 = 2 * Math.PI * 0.4;    // slow arm drift, below the band
-  const w2 = 2 * Math.PI * 5;      // tremor, inside the band
+  const w1 = 2 * Math.PI * 1.2;    // slow arm drift, below the tremor band
+  const w2 = 2 * Math.PI * 5;      // tremor, inside it
   const a = new Float64Array(n);
   for (let i = 0; i < n; i++) {
     const t = i / fs;
     a[i] = -0.02 * w1 * w1 * Math.sin(w1 * t) + -0.004 * w2 * w2 * Math.sin(w2 * t);
   }
   const withBand = accelToDisplacement(a, fs, { loHz: 3, hiHz: 12 });
-  const wideBand = accelToDisplacement(a, fs, { loHz: 0.2, hiHz: 12 });
+  const wideBand = accelToDisplacement(a, fs, { loHz: 0.8, hiHz: 12 });
 
-  // The 2 cm drift dwarfs the 4 mm tremor, so a wide band must show far more
-  // excursion than a band that excludes it.
-  assert.ok(
-    peakToPeak(wideBand) > peakToPeak(withBand) * 3,
-    'the band limit is not actually excluding the slow component',
-  );
+  // The 2 cm drift dwarfs the 4 mm tremor, so a band that admits it must show
+  // far more excursion than one that does not.
+  const ratio = peakToPeak(wideBand) / peakToPeak(withBand);
+  assert.ok(ratio > 3, `the band limit is not excluding the slow component: ratio ${ratio.toFixed(2)}`);
+
+  // And the tremor itself must survive the narrow band: excluding everything
+  // would pass the assertion above and measure nothing.
+  assert.ok(peakToPeak(withBand) > 0.004 * 0.5,
+    'the in-band tremor was thrown away along with the drift');
 });
 
 test('parsePadsRecord reads the seven documented columns', () => {
@@ -206,4 +214,22 @@ test('the spectrum path KEEPS its window, because that is the correct choice the
   const s = tremorSpectrum(x, fs, { loHz: 2, hiHz: 15 });
   assert.ok(Math.abs(s.hz - 5) < 0.2, `the dominant tone must still be found at 5 Hz, got ${s.hz.toFixed(2)}`);
   assert.ok(s.prominence > 5, 'and it must still stand clear of the floor');
+});
+
+test('REGRESSION: a band whose taper reaches below DC must not return NaN', () => {
+  // Introduced by replacing the brick-wall filter with a tapered one. The
+  // brick wall zeroed the DC bin as a side effect of zeroing everything below
+  // the cutoff. A taper does not, and the integration divides by (2*pi*f)^2,
+  // so DC came through with infinite gain and NaN'd the whole record.
+  //
+  // It only surfaced for a wide band, because the transition width scales with
+  // the band, and the production band never reaches DC. A latent landmine for
+  // any caller who widened the band.
+  const fs = 100, n = 1024;
+  const x = Float64Array.from({ length: n }, (_, i) => Math.sin(2 * Math.PI * 5 * i / fs) * 0.05);
+  for (const band of [{ loHz: 0.2, hiHz: 12 }, { loHz: 0.05, hiHz: 20 }, { loHz: 3.5, hiHz: 8 }]) {
+    const d = accelGToDisplacementMm(x, fs, band);
+    assert.ok(d.every(Number.isFinite),
+      `band ${band.loHz}-${band.hiHz} produced a non-finite sample`);
+  }
 });

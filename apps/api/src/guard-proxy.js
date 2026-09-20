@@ -76,6 +76,11 @@ export function createGuardProxy({ lookup = dns.lookup, onBlocked, addressPolicy
     onBlocked?.({ host, why });
   };
 
+  // Every tunnel socket is tracked, because a CONNECT tunnel is a raw socket
+  // the HTTP server does not own and close() therefore waits on it for ever.
+  // The corpus seeder hung on exactly this after scanning all forty sites.
+  const tunnels = new Set();
+
   const server = http.createServer(async (req, res) => {
     // Plain HTTP arrives in absolute form because we are a proxy.
     let target;
@@ -123,7 +128,12 @@ export function createGuardProxy({ lookup = dns.lookup, onBlocked, addressPolicy
     try { ip = await resolveSafely(rawHost, lookup, addressPolicy); }
     catch (e) { note(rawHost, e.message); clientSocket.end('HTTP/1.1 403 Forbidden\r\n\r\n'); return; }
 
+    tunnels.add(clientSocket);
+    clientSocket.on('close', () => tunnels.delete(clientSocket));
+
     const upstream = net.connect({ host: ip, port }, () => {
+      tunnels.add(upstream);
+      upstream.on('close', () => tunnels.delete(upstream));
       clientSocket.write('HTTP/1.1 200 Connection Established\r\n\r\n');
       if (head && head.length) upstream.write(head);
       upstream.pipe(clientSocket);
@@ -143,10 +153,13 @@ export function createGuardProxy({ lookup = dns.lookup, onBlocked, addressPolicy
       server.listen(0, '127.0.0.1', () => resolve(`http://127.0.0.1:${server.address().port}`));
     }),
     close: () => new Promise((resolve) => {
-      // Without this, close() waits on keep-alive sockets for ever and a
-      // test suite hangs instead of finishing.
+      // Keep-alive sockets AND raw CONNECT tunnels, or close() never returns.
+      for (const s of tunnels) s.destroy();
+      tunnels.clear();
       server.closeAllConnections?.();
       server.close(() => resolve());
+      // A socket that is already gone can leave close() waiting on nothing.
+      setTimeout(resolve, 1500).unref?.();
     }),
   };
 }

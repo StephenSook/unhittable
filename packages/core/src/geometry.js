@@ -272,21 +272,34 @@ export function judgeElement(rect, spacing, pathOrPaths, pxPerMm, { want = 0.95 
   // the page rather than once per element.
   const paths = Array.isArray(pathOrPaths) ? pathOrPaths : [pathOrPaths];
 
-  let worst = Infinity, best = -Infinity, worstPath = paths[0];
+  let worst = Infinity, best = -Infinity;
   for (const p of paths) {
     const h = holdFractionRect(p, pxPerMm, rect.w, rect.h);
-    if (h < worst) { worst = h; worstPath = p; }
+    if (h < worst) worst = h;
     if (h > best) best = h;
   }
 
-  // The PUBLISHED hold is the worst azimuth. Our world frame has a
-  // well-determined vertical, from gravity, and an arbitrary rotation about
-  // it, because no magnetometer is available to fix a heading. A single
-  // reading therefore depends on a choice that carries no physical meaning,
-  // and for a wide short control the two ends of that choice can differ by
-  // thirty points. An accessibility floor takes the unlucky alignment.
+  // The PUBLISHED hold is the worst azimuth. Our frame has a well-determined
+  // vertical, from gravity, and an arbitrary rotation about it, because no
+  // magnetometer is available to fix a heading. A single reading therefore
+  // depends on a choice that carries no physical meaning, and for a wide
+  // short control the two ends of that choice can differ by thirty points.
+  // An accessibility floor takes the unlucky alignment.
   const hold = worst;
-  const scale = scaleForHoldRect(worstPath, pxPerMm, rect.w, rect.h, want);
+
+  // THE SIZE RECOMMENDATION NEEDS ITS OWN MAXIMUM, not the scale of whichever
+  // azimuth happened to hold worst at the CURRENT size. Those are different
+  // questions: the angle that is hardest right now need not be the angle that
+  // demands the most enlargement, because the two orderings can cross as the
+  // rectangle grows. Taking the first answer published a size that failed at
+  // some other azimuth, which is the one thing a size recommendation must not
+  // do.
+  let scale = null;
+  for (const p of paths) {
+    const k = scaleForHoldRect(p, pxPerMm, rect.w, rect.h, want);
+    if (k === null) { scale = null; break; }
+    if (scale === null || k > scale) scale = k;
+  }
 
   return {
     wPx: rect.w,

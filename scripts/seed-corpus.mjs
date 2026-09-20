@@ -24,6 +24,7 @@ import { chromium } from 'playwright-core';
 import { scanUrl, ResolverCache, USER_AGENT } from '../apps/api/src/scanner.js';
 import { getRecording, DEFAULT_RECORDING } from '../apps/api/src/recordings.js';
 import * as db from '../apps/api/src/db.js';
+import { createGuardProxy } from '../apps/api/src/guard-proxy.js';
 import { isAllowed, statusMeaning } from '../packages/core/src/robots.js';
 
 const args = process.argv.slice(2);
@@ -92,6 +93,14 @@ if (pool) await db.migrate(pool);
 const browser = await chromium.launch({ headless: true });
 const resolver = new ResolverCache();
 
+// The sweep that produces the published numbers goes through the same
+// connection fence the deployed API uses. It did not, and that was the point
+// of the finding: the corpus is the most security-sensitive path here,
+// because it visits forty third-party sites unattended.
+const guardProxy = createGuardProxy();
+const proxyUrl = await guardProxy.listen();
+console.log(`connection fence listening on ${proxyUrl}\n`);
+
 const outcome = { scanned: [], skippedRobots: [], excluded: [], failed: [] };
 let i = 0;
 
@@ -110,7 +119,7 @@ for (const site of sites.slice(0, LIMIT)) {
   let report;
   try {
     report = await scanUrl({ browser, resolver }, {
-      url: site.url, path: recording.path, cpi: 800, viewport: VIEWPORT, timeoutMs: 30_000,
+      url: site.url, path: recording.path, cpi: 800, viewport: VIEWPORT, timeoutMs: 30_000, proxyUrl,
     });
   } catch (e) {
     console.log(`${tag}: FAILED, ${e.message.slice(0, 110)}`);
@@ -143,6 +152,7 @@ for (const site of sites.slice(0, LIMIT)) {
 }
 
 await browser.close();
+await guardProxy.close();
 
 console.log('\n================ CORPUS ================');
 console.log(`scanned  ${outcome.scanned.length}`);

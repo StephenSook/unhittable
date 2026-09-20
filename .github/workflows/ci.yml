@@ -74,6 +74,31 @@ jobs:
             exit 1;
           }
 
+      # Every published figure is generated into docs/FACTS.md from one run.
+      # The cohort half needs no database, so it is checked here; the corpus
+      # half needs one and is regenerated when the corpus is re-seeded.
+      - name: The published figures match the committed cohort
+        run: |
+          node -e "
+            const fs=require('fs');
+            const c=JSON.parse(fs.readFileSync('apps/web/data/cohort.json','utf8')).primary;
+            const f=fs.readFileSync('docs/FACTS.md','utf8');
+            const want=[
+              ['subjects', String(c.subjects)],
+              ['clearing', String(c.clearing)],
+              ['median amplitude', c.amplitudeMm.median.toFixed(2)],
+              ['wider than target', String(c.exceedsWholeTarget24)],
+              ['below 95', String(c.below95At24)],
+            ];
+            let bad=0;
+            for (const [label,v] of want) {
+              if (!f.includes(v)) { console.error('FACTS.md is missing the current '+label+': '+v); bad++; }
+            }
+            if (bad) { console.error('regenerate with: node --env-file=.env scripts/facts.mjs'); process.exit(1); }
+            console.log('FACTS.md matches the committed cohort');
+          "
+        
+
       - name: No secrets in the tree
         run: |
           if git ls-files | grep -E '(^|/)\.env$' ; then echo ".env is tracked"; exit 1; fi

@@ -11,8 +11,8 @@ tick. The number comes from a 2006 study of able-bodied thumbs on touchscreens.
 We replayed **clinically recorded tremor** against it.
 
 ```
-38 live sites          3,842 interactive controls measured as rendered
-95.9% pass WCAG 2.5.8  72.1% of them cannot be reliably held
+38 live sites          3,921 interactive controls measured as rendered
+95.9% pass WCAG 2.5.8  73.9% of them cannot be reliably held
                        by a MEDIAN clinically recorded tremor
 ```
 
@@ -41,14 +41,14 @@ Paste a URL into the live page and it will do this to your site in about three s
 | Subjects measured | **260** clinically assessed people |
 | Postural recordings analysed | **1,560** |
 | Containing a detectable tremor | **52** (3.3%), from 29 subjects |
-| Median amplitude of those 52 | **1.88 mm**, which is 59 px of cursor travel at 800 cpi |
-| Tremor wider than the whole 24 px target | **46 of 52** |
-| Hold a 24 px target under 95% of the time | **36 of 52** |
-| Miss more often than they hit | **22 of 52** |
-| Still under 95% at the 44 px AAA size | **25 of 52** |
+| Median amplitude of those 52 | **2.04 mm**, which is 64 px of cursor travel at 800 cpi |
+| Tremor wider than the whole 24 px target | **45 of 52** |
+| Hold a 24 px target under 95% of the time | **41 of 52** |
+| Miss more often than they hit | **26 of 52** |
+| Still under 95% at the 44 px AAA size | **28 of 52** |
 
-Across the 38-site corpus the median interactive control is **142 × 29 px**. It passes.
-It is bound by its **height** on 3,350 controls against 232 bound by width, because
+Across the 38-site corpus the median interactive control is **143 × 30 px**. It passes.
+It is bound by its **height** on 3,417 controls against 244 bound by width, because
 the real web is made of wide short buttons and a square minimum structurally cannot
 describe the shape that fails.
 
@@ -109,6 +109,11 @@ everyone.
 - **The hand-to-pixel mapping is genuinely undetermined**, because pointer
   acceleration is OS-specific and user-configurable, so every result is published as a
   sweep across 200 to 1600 cpi rather than as a single number.
+
+Every figure above is generated into [`docs/FACTS.md`](docs/FACTS.md) from one run,
+and CI fails if that file is stale. These numbers have been regenerated four times
+as defects were found, and a figure retyped into three documents disagrees with
+itself eventually.
 
 ## Run it
 

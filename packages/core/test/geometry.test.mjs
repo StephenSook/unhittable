@@ -11,7 +11,7 @@ import {
   cpiToCssPxPerMm, holdFractionRect, axisHoldFraction, minimumBox,
   scaleForHoldRect, circleIntersectsRect, circlesIntersect, meetsSizeMinimum,
   evaluateSpacing, judgeElement, summarise, holdSquare,
-  rotatePath, holdOverAzimuths, extentOverAzimuths, bindingSide,
+  rotatePath, holdOverAzimuths, extentOverAzimuths, bindingSide, azimuthFamily,
 } from '../src/geometry.js';
 import { recordingToPath, holdFraction, cpiToPxPerMm } from '../src/replay.js';
 
@@ -338,4 +338,26 @@ test('bindingSide names a property of the element, not of the tremor', () => {
   assert.equal(bindingSide({ w: 200, h: 20 }), 'height');
   assert.equal(bindingSide({ w: 20, h: 200 }), 'width');
   assert.equal(bindingSide({ w: 44, h: 44 }), null);
+});
+
+test('REGRESSION: the recommended size holds at EVERY azimuth, not just the worst one now', () => {
+  // The bug: the code took the azimuth with the lowest hold at the CURRENT
+  // size and computed the enlargement for that one. The angle that is hardest
+  // right now need not be the angle demanding the most enlargement, because
+  // the two orderings cross as the rectangle grows. The published "would
+  // need" size then failed at some other azimuth, which is the single thing a
+  // size recommendation must never do.
+  const ppm = cpiToPxPerMm(800);
+  const family = azimuthFamily(path, 12);
+  for (const rect of [{ x: 0, y: 0, w: 96, h: 44 }, { x: 0, y: 0, w: 200, h: 20 },
+                      { x: 0, y: 0, w: 24, h: 24 }, { x: 0, y: 0, w: 141, h: 30 }]) {
+    const j = judgeElement(rect, { spacingApplies: false, spacingPass: true }, family, ppm, { want: 0.95 });
+    if (j.scaleNeeded === null) continue;
+    for (const p of family) {
+      const h = holdFractionRect(p, ppm, j.needWPx, j.needHPx);
+      assert.ok(h >= 0.95 - 1e-9,
+        `${rect.w}x${rect.h} was told it needs ${j.needWPx.toFixed(0)}x${j.needHPx.toFixed(0)}, ` +
+        `but at one azimuth that size holds only ${(h * 100).toFixed(1)}%`);
+    }
+  }
 });
