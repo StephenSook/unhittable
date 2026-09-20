@@ -19,6 +19,7 @@ import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
 import { chromium } from 'playwright-core';
 import { scanUrl, ResolverCache, VIEWPORTS, USER_AGENT } from './scanner.js';
+import { createGuardProxy } from './guard-proxy.js';
 import { loadRecordings, getRecording, DEFAULT_RECORDING } from './recordings.js';
 import * as db from './db.js';
 import { normaliseTargetUrl } from '@unhittable/core/url-guard.js';
@@ -75,6 +76,12 @@ export async function build({ logger = true } = {}) {
   const resolver = new ResolverCache();
   const queue = new ScanQueue(MAX_CONCURRENT_SCANS);
 
+  // One proxy for the process. Every scan's browser context routes through
+  // it, and it is the only component that opens a socket to the outside.
+  const guardProxy = createGuardProxy();
+  const proxyUrl = await guardProxy.listen();
+  app.log.info({ proxyUrl }, 'connection fence listening');
+
   let browser = null;
   let browserError = null;
   async function getBrowser() {
@@ -110,6 +117,7 @@ export async function build({ logger = true } = {}) {
     browser: browser?.isConnected() ? 'warm' : 'cold',
     browserError,
     database: pool ? 'configured' : 'absent',
+    connectionFence: 'active',
     recordings: recordings.ids.length,
     queueDepth: queue.depth,
     uptimeSeconds: Math.round(process.uptime()),
@@ -168,7 +176,7 @@ export async function build({ logger = true } = {}) {
     try {
       const b = await getBrowser();
       report = await queue.run(() => scanUrl({ browser: b, resolver }, {
-        url: normalised.href, path: rec.path, cpi, viewport,
+        url: normalised.href, path: rec.path, cpi, viewport, proxyUrl,
       }));
     } catch (e) {
       const code = e.statusCode || (/Refusing|not a web page|Could not load|Could not resolve|does not resolve/.test(e.message) ? 400 : 500);
@@ -206,6 +214,7 @@ export async function build({ logger = true } = {}) {
 
   app.addHook('onClose', async () => {
     await browser?.close().catch(() => {});
+    await guardProxy.close().catch(() => {});
     await pool?.end().catch(() => {});
   });
 

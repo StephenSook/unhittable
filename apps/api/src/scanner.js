@@ -10,6 +10,7 @@ import { collectTargets, TARGET_SELECTOR } from '@unhittable/core/probe.js';
 import { normaliseTargetUrl, assertFetchable } from '@unhittable/core/url-guard.js';
 import { evaluateSpacing, judgeElement, summarise, cpiToCssPxPerMm } from '@unhittable/core/geometry.js';
 import { recordingToPath } from '@unhittable/core/replay.js';
+import { createGuardProxy } from './guard-proxy.js';
 
 /** We say who we are. A site owner reading their logs deserves to know. */
 export const USER_AGENT =
@@ -100,7 +101,16 @@ export async function scanUrl({ browser, resolver = new ResolverCache(), guard =
   await guard(target, (h) => resolver.resolve(h));
 
   const log = makeBlockLog();
+
+  // Chromium reaches the network ONLY through the validating proxy. The
+  // route handler below is a second layer for scheme and policy, but it
+  // cannot be the SSRF boundary on its own: it approves a request and then
+  // lets the browser resolve the name again, which is a rebinding window.
+  // The proxy resolves once and connects to the address it validated.
+  const proxyUrl = opts.proxyUrl ?? null;
+
   const context = await browser.newContext({
+    ...(proxyUrl ? { proxy: { server: proxyUrl } } : {}),
     viewport: { width: viewport.width, height: viewport.height },
     deviceScaleFactor: viewport.deviceScaleFactor,
     isMobile: viewport.isMobile,
@@ -135,6 +145,14 @@ export async function scanUrl({ browser, resolver = new ResolverCache(), guard =
     }
     return route.continue();
   });
+
+  // WebSockets are routed separately by Playwright, so the HTTP route
+  // handler above does not see them at all. A hostile page could otherwise
+  // open ws://127.0.0.1 and place returned frames into a button label. The
+  // measurement needs no sockets, so they are refused outright.
+  try {
+    await context.routeWebSocket('**', (ws) => ws.close());
+  } catch { /* older Playwright: the proxy still fences the connection */ }
 
   const page = await context.newPage();
   // A modal dialog would hang the run forever, so they are dismissed rather
@@ -180,11 +198,22 @@ export async function scanUrl({ browser, resolver = new ResolverCache(), guard =
   try { await page.evaluate(() => document.fonts && document.fonts.ready); } catch { /* no font API */ }
   await page.waitForTimeout(400);
 
+  // page.evaluate runs in the page's own world and calls page-controlled
+  // APIs, so a hostile site can replace one of them with an infinite loop and
+  // occupy a worker for ever. Playwright has no timeout on evaluate, so the
+  // deadline is enforced here and the context is destroyed when it expires.
   let probe;
+  const evalTimeoutMs = opts.evalTimeoutMs ?? 15_000;
   try {
-    probe = await page.evaluate(collectTargets, { selector: TARGET_SELECTOR, maxTargets: opts.maxTargets ?? 1500 });
+    let timer;
+    probe = await Promise.race([
+      page.evaluate(collectTargets, { selector: TARGET_SELECTOR, maxTargets: opts.maxTargets ?? 1500 }),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`measurement did not finish within ${evalTimeoutMs} ms`)), evalTimeoutMs);
+      }),
+    ]).finally(() => clearTimeout(timer));
   } catch (e) {
-    await context.close();
+    await context.close().catch(() => {});
     throw new Error(`Could not measure ${finalUrl}: ${e.message.split('\n')[0]}`);
   }
 
