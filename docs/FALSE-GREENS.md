@@ -197,10 +197,74 @@ explains: a real oscillation scores 1.000, a bump scores 0.311.
 
 ---
 
+## 12. A window that inflated every hold rate, invisibly
+
+**What it said.** A true 2.000 mm tremor amplitude, recovered correctly. Peak
+to peak came back as 3.981 mm against a true 4.000 mm, an error under half a
+percent, and the headline amplitude on every page was right.
+
+**What was wrong.** A Hann window was applied before integration and never
+removed, so the recovered displacement carried the window's envelope. Measured
+along the record, a flat 2.000 mm amplitude read **0.778 mm** one fifth of the
+way in, 1.991 mm at the centre, and 0.796 mm four fifths in.
+
+**Why it survived.** Peak-to-peak cannot see it. The peak lands near the middle
+where the window gain is 1, so the number everybody looks at was correct. What
+it corrupted was the **hold fraction**, which integrates over the whole
+retained record: most of the evaluated trace had been pulled toward the centre
+of the target, so every published hold rate was more generous than the truth.
+
+**The lesson that generalises.** A taper is right for estimating a spectrum and
+wrong for reconstructing an amplitude, and the two paths had been sharing one
+function. When one routine serves two purposes, ask whether both purposes want
+the same preprocessing.
+
+**Prevented by.** A regression test that asserts **flatness** across the
+retained window rather than peak-to-peak, because an assertion on peak-to-peak
+would have passed throughout.
+
+---
+
+## 13. Reading a wrist that turned as a hand that moved
+
+**What it said.** Displacement in millimetres, from a clinical recording, with
+the whole pipeline validated against synthetic sinusoids of known amplitude.
+
+**What was wrong.** An accelerometer at rest does not read zero. It reads
+gravity projected onto its own axes. So a wrist rotating in place, translating
+not at all, changes how much gravity falls on each axis and produces a signal
+in exactly the tremor band. Integrated twice, a **five degree oscillation with
+zero translation** becomes **1.75 mm** of apparent movement, which is larger
+than the median amplitude across our entire 260-subject cohort.
+
+**Why it survived.** Every validation we had used synthetic **translation**.
+The pipeline was correct for the case we tested and untested for the case that
+mattered. The synchronised gyroscope needed to detect the difference was
+parsed out of every record and never used.
+
+**The lesson that generalises.** Validating against the signal you expect tells
+you the code computes what you meant. It says nothing about whether what you
+meant is what the instrument measures. Ask what else could produce this
+reading, then synthesise that and check.
+
+**Prevented by.** A distinguishing pair rather than a single assertion, because
+the easy way to pass "rotation is removed" is to destroy everything: pure
+rotation must fall by more than five times **and** a true 4 mm translation must
+survive within 12 percent **and** a mixed record must recover the translation.
+
+**Both of these were errors in our own favour.** Correcting them made the
+finding stronger: median hold of a 24 px target fell from 74% to 58%, and
+tremors wider than the entire target rose from 37 to 41 of 52. That direction
+is worth stating plainly, because a correction that helps you is the one you
+are least likely to go looking for.
+
+---
+
 ## The pattern
 
-Nine of these eleven produced **no error**. Most produced a number that was the
-right shape, in the right units, in the right range. The recurring defences are:
+Eleven of these thirteen produced **no error**. Most produced a number that was
+the right shape, in the right units, in the right range. The recurring defences
+are:
 
 1. **Two independent renderings of the same quantity**, so they can disagree.
 2. **A guard proven to fire**, by planting the thing it is supposed to catch,
@@ -210,3 +274,7 @@ right shape, in the right units, in the right range. The recurring defences are:
    involved.
 5. **Asking what a ratio is made of**, because two names for the same number
    always divide to 1.
+6. **An adversarial reader who wants it to be wrong.** Entries 12 and 13, the
+   two that actually threatened the finding, were found by a second model
+   asked to get this disqualified. Neither would have been found by testing
+   harder, because both passed every test we had thought to write.

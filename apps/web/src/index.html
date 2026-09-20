@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Unhittable: the accessibility number nobody checked</title>
-<meta name="description" content="WCAG says a button must be 24 pixels. We replayed 52 clinically recorded tremors against one. 37 are wider than the whole target. Paste a URL and measure your own site.">
+<meta name="description" content="WCAG says a button must be 24 pixels. We replayed 52 clinically recorded tremors against it. 41 are wider than the whole target. We then measured 3,881 controls on 38 live sites: 95.9% pass the standard and 73.9% cannot be held. Paste a URL and measure your own site.">
 <meta property="og:title" content="Unhittable">
-<meta property="og:description" content="Watch a clinically recorded tremor try to click your website. The WCAG minimum gets held 16% of the time.">
+<meta property="og:description" content="Watch a clinically recorded tremor try to click your website. Across 3,881 controls on 38 live sites, 95.9% pass WCAG and 73.9% cannot be reliably held.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="app.css">
@@ -247,7 +247,7 @@
   <p class="micro">How, and what we are not claiming</p>
   <h2 style="margin-top:18px; max-width:24ch">The physics is not ours. The measurement is.</h2>
 
-  <div class="cols cols-3" style="margin-top:38px">
+  <div class="cols" style="margin-top:38px">
     <div class="note">
       <h3>Acceleration to distance</h3>
       <p>
@@ -256,6 +256,18 @@
         integration is a division rather than a running sum. Summing twice in time turns any small
         offset into a parabola. Band-limiting to the clinical tremor range removes that singularity
         before it can do damage.
+      </p>
+    </div>
+    <div class="note">
+      <h3>A wrist that turns is not a hand that moved</h3>
+      <p>
+        An accelerometer at rest reads gravity projected onto its own axes, so a wrist rotating in
+        place, translating not at all, still produces a signal in the tremor band. Integrate it
+        twice and a stationary hand appears to move: a five degree oscillation is worth
+        <strong>1.75&nbsp;mm</strong>, larger than the median amplitude we measured. The dataset
+        records a gyroscope and our first version never touched it. We now rotate into a frame
+        where gravity is constant and subtract it there. Measured rejection is 6.3x, so a residual
+        remains and we do not claim otherwise.
       </p>
     </div>
     <div class="note">
@@ -333,8 +345,15 @@
       </p>
       <div class="seg" style="margin-top:20px">
         <a class="btn ghost" href="https://github.com/StephenSook/unhittable">Source and method</a>
+        <a class="btn ghost" href="https://expo.dev/artifacts/eas/md9vzJ1v_mV8EPJ8Mzw30tqHqJFAqEY3I0rYFyU0C4c.apk">Android app</a>
         <a class="btn ghost" href="#method">What we are not claiming</a>
       </div>
+      <p class="micro" style="margin-top:12px; text-transform:none; letter-spacing:0; color:var(--dim); line-height:1.5">
+        The Android build measures YOUR hand with the phone's own accelerometer, works out the
+        button size you need, and then checks that prediction against your actual taps. On a
+        touchscreen a millimetre of finger travel is a millimetre off target, with no
+        counts-per-inch to sweep, which makes it the cleaner half of this measurement.
+      </p>
     </div>
     <div>
       <p class="micro">This page against its own standard</p>
