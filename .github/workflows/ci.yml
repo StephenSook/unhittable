@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push: { branches: [main] }
+  pull_request: { branches: [main] }
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22', cache: 'npm' }
+
+      - run: npm ci
+
+      # The integration suite drives a real browser. Installing it here rather
+      # than assuming a cached one is deliberate: a missing browser fails this
+      # step loudly instead of making the scanner tests skip quietly.
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      # Output goes to a file and the EXIT CODE is read bare. A pipe into tee
+      # or tail reports the exit status of tee, which is always zero, and a
+      # red suite then reads as a green one.
+      - name: Unit and integration tests
+        run: |
+          set -o pipefail
+          node --test packages/core/test/*.mjs apps/api/test/*.test.mjs > test-output.txt 2>&1
+          status=$?
+          cat test-output.txt
+          exit $status
+
+      # A suite that silently stopped collecting files passes every assertion
+      # it runs, because it runs none. The floor is the guard against that.
+      - name: Assert the suite actually ran
+        run: |
+          pass=$(grep -E '^# pass ' test-output.txt | awk '{print $3}')
+          fail=$(grep -E '^# fail ' test-output.txt | awk '{print $3}')
+          echo "pass=$pass fail=$fail"
+          test -n "$pass" || { echo "could not read a pass count; the suite did not report"; exit 1; }
+          test "$fail" = "0" || { echo "$fail failing tests"; exit 1; }
+          test "$pass" -ge 120 || { echo "only $pass tests ran, expected at least 120; tests have gone missing"; exit 1; }
+
+      # The published site is assembled rather than committed, so a broken
+      # import specifier must fail the build and not the visitor.
+      - name: Build the site
+        run: node scripts/build-web.mjs
+
+      # Derived artifacts are generated from committed inputs, so regenerating
+      # them must produce no diff. If it does, the committed copy is stale and
+      # the page is quoting a number the code no longer produces.
+      - name: Derived data is not stale
+        run: |
+          node scripts/manifest.mjs > /dev/null
+          git diff --exit-code -- packages/core/data/manifest.json || {
+            echo "manifest.json is stale; run: node scripts/manifest.mjs";
+            exit 1;
+          }
+
+      - name: No secrets in the tree
+        run: |
+          if git ls-files | grep -E '(^|/)\.env$' ; then echo ".env is tracked"; exit 1; fi
+          if git grep -nE 'postgres(ql)?://[^ "]*:[^ "@]+@' -- . ':(exclude).github/workflows/ci.yml' ':(exclude)*.example' ; then
+            echo "a database URL with a password is committed"; exit 1;
+          fi
+          echo "clean"
+
+      - uses: actions/upload-pages-artifact@v3
+        if: github.ref == 'refs/heads/main'
+        with: { path: _site }
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
