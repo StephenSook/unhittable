@@ -14,17 +14,14 @@ const DATA = 'packages/core/data';
 const COHORT = JSON.parse(fs.readFileSync('apps/web/data/cohort.json', 'utf8'));
 const byKey = new Map(COHORT.primary.records.map((r) => [`${r.subject}_${r.task}_${r.wrist}`, r]));
 
-// Read the condition for every subject straight out of the dataset's own
-// patient files, so a label is never something we decided.
+// Conditions come from a file committed to the repository rather than from a
+// scratch directory the dataset was downloaded into. The first version read
+// /tmp, so on any machine that had not just fetched PADS every label
+// regenerated as null, and the manifest was not reproducible from a clean
+// clone. CI caught that on the staleness gate's first run.
 const CONDITIONS = (() => {
-  const dir = '/tmp/pads_wide/patients';
-  const m = new Map();
-  if (!fs.existsSync(dir)) return m;
-  for (const f of fs.readdirSync(dir)) {
-    const mm = /^patient_(\d+)\.json$/.exec(f);
-    if (mm) m.set(mm[1], JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')).condition);
-  }
-  return m;
+  const doc = JSON.parse(fs.readFileSync(path.join(DATA, 'conditions.json'), 'utf8'));
+  return new Map(Object.entries(doc.subjects));
 })();
 
 const TASK_LABEL = {
