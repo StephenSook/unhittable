@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Unhittable: the accessibility number nobody checked</title>
-<meta name="description" content="WCAG says a button must be 24 pixels. We replayed 52 clinically recorded tremors against it. 41 are wider than the whole target. We then measured 3,881 controls on 38 live sites: 95.9% pass the standard and 73.9% cannot be held. Paste a URL and measure your own site.">
+<meta name="description" content="WCAG says a button must be 24 pixels. We replayed 52 clinically recorded tremors against it. 46 are wider than the whole target. We then measured 3,842 controls on 38 live sites: 95.9% pass the standard and 72.1% cannot be held. Paste a URL and measure your own site.">
 <meta property="og:title" content="Unhittable">
-<meta property="og:description" content="Watch a clinically recorded tremor try to click your website. Across 3,881 controls on 38 live sites, 95.9% pass WCAG and 73.9% cannot be reliably held.">
+<meta property="og:description" content="Watch a clinically recorded tremor try to click your website. Across 3,842 controls on 38 live sites, 95.9% pass WCAG and 72.1% cannot be reliably held.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="app.css">
@@ -259,15 +259,14 @@
       </p>
     </div>
     <div class="note">
-      <h3>A wrist that turns is not a hand that moved</h3>
+      <h3>A correction we built, shipped, and removed</h3>
       <p>
-        An accelerometer at rest reads gravity projected onto its own axes, so a wrist rotating in
-        place, translating not at all, still produces a signal in the tremor band. Integrate it
-        twice and a stationary hand appears to move: a five degree oscillation is worth
-        <strong>1.75&nbsp;mm</strong>, larger than the median amplitude we measured. The dataset
-        records a gyroscope and our first version never touched it. We now rotate into a frame
-        where gravity is constant and subtract it there. Measured rejection is 6.3x, so a residual
-        remains and we do not claim otherwise.
+        A rotating accelerometer that carries gravity fabricates movement, because tilting changes
+        how much gravity lands on each axis. We built a gyroscope correction for it. Then we
+        measured the actual files: this dataset's channel is <strong>already gravity-free</strong>,
+        averaging 0.001 to 0.14&nbsp;g rather than the 1&nbsp;g a gravity-bearing channel shows. The
+        confound has no mechanism here, and our filter was deriving orientation from noise. It is
+        gone from this path and lives on the phone, where gravity really is present.
       </p>
     </div>
     <div class="note">

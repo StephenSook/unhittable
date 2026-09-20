@@ -202,7 +202,7 @@ export async function build({ logger = true } = {}) {
 
   app.get('/api/corpus', async (req, reply) => {
     if (!pool) return reply.code(503).send({ error: 'The corpus store is not configured on this instance.' });
-    try { return await db.corpusSummary(pool); }
+    try { return await db.corpusSummary(pool, DEFAULT_RECORDING); }
     catch (e) { return reply.code(503).send({ error: `Corpus unavailable: ${e.message}` }); }
   });
 

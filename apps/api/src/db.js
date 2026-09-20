@@ -124,7 +124,12 @@ export async function saveScan(pool, report, { recordingId, inCorpus = false }) 
  * visitor scanning their own staging site, which is the difference between a
  * measurement and a vanity counter.
  */
-export async function corpusSummary(pool) {
+export async function corpusSummary(pool, recordingId) {
+  // Scoped to ONE recording, always. The cache key includes recording_id, so
+  // changing the default creates a second set of rows for the same pages
+  // rather than replacing them, and an unscoped aggregate then counts every
+  // control twice. It did: 3,842 controls were reported as 7,723 and the
+  // number looked merely large rather than wrong.
   const { rows: [agg] } = await pool.query(`
     SELECT
       count(DISTINCT s.host)                                   AS sites,
@@ -144,16 +149,16 @@ export async function corpusSummary(pool) {
       max(s.scanned_at)                                        AS last_scan
     FROM scans s
     JOIN elements e ON e.scan_id = s.id
-    WHERE s.in_corpus`);
+    WHERE s.in_corpus AND ($1::text IS NULL OR s.recording_id = $1)`, [recordingId ?? null]);
 
   const { rows: sites } = await pool.query(`
     SELECT s.host, s.final_url, s.title, s.n_targets, s.n_wcag_pass,
            s.n_hand_pass, s.n_standard_not_hand, s.median_hold, s.worst_hold,
            s.viewport, s.scanned_at
       FROM scans s
-     WHERE s.in_corpus
+     WHERE s.in_corpus AND ($1::text IS NULL OR s.recording_id = $1)
      ORDER BY s.n_standard_not_hand DESC, s.host
-     LIMIT 200`);
+     LIMIT 200`, [recordingId ?? null]);
 
   return { aggregate: agg, sites };
 }

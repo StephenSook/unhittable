@@ -11,8 +11,8 @@ tick. The number comes from a 2006 study of able-bodied thumbs on touchscreens.
 We replayed **clinically recorded tremor** against it.
 
 ```
-38 live sites          3,881 interactive controls measured as rendered
-95.9% pass WCAG 2.5.8  74.1% of them cannot be reliably held
+38 live sites          3,842 interactive controls measured as rendered
+95.9% pass WCAG 2.5.8  72.1% of them cannot be reliably held
                        by a MEDIAN clinically recorded tremor
 ```
 
@@ -41,14 +41,14 @@ Paste a URL into the live page and it will do this to your site in about three s
 | Subjects measured | **260** clinically assessed people |
 | Postural recordings analysed | **1,560** |
 | Containing a detectable tremor | **52** (3.3%), from 29 subjects |
-| Median amplitude of those 52 | **2.31 mm**, which is 73 px of cursor travel at 800 cpi |
-| Tremor wider than the whole 24 px target | **41 of 52** |
+| Median amplitude of those 52 | **1.88 mm**, which is 59 px of cursor travel at 800 cpi |
+| Tremor wider than the whole 24 px target | **46 of 52** |
 | Hold a 24 px target under 95% of the time | **36 of 52** |
-| Miss more often than they hit | **21 of 52** |
-| Still under 95% at the 44 px AAA size | **29 of 52** |
+| Miss more often than they hit | **22 of 52** |
+| Still under 95% at the 44 px AAA size | **25 of 52** |
 
-Across the 38-site corpus the median interactive control is **141 × 30 px**. It passes.
-It is bound by its **height** on 3,374 controls against 247 bound by width, because
+Across the 38-site corpus the median interactive control is **142 × 29 px**. It passes.
+It is bound by its **height** on 3,350 controls against 232 bound by width, because
 the real web is made of wide short buttons and a square minimum structurally cannot
 describe the shape that fails.
 
@@ -91,11 +91,12 @@ everyone.
   meaning, and on a wide short control the two ends of that choice differ by up to
   36 points. Every figure here is the floor across 12 azimuths. The finding barely
   moves under it, which is the point of checking.
-- **Wrist rotation is removed, and it had to be.** An accelerometer reads gravity
-  projected onto its own axes, so a wrist turning in place fabricates apparent
-  movement: 1.75 mm for a five degree oscillation, larger than our median. The
-  gyroscope PADS records is used to cancel it. Measured rejection is 6.3x, so a
-  residual remains and is not claimed to be zero.
+- **No attitude correction on the clinical path, and that is deliberate.** We built
+  one, shipped it, and removed it again: PADS supplies a **gravity-free**
+  accelerometer channel (mean magnitude 0.001 to 0.14 g, not ~1 g), so the
+  rotation-into-gravity confound has no mechanism here and the filter was deriving
+  orientation from noise. The phone is the opposite case and does apply it. Full
+  write-up as false green 14.
 - **Most recordings contain no detectable tremor.** 52 of 1,560. The set shipped on the
   page includes a healthy control that holds a 24 px target 100% of the time, and a
   Parkinson's patient's wrist that does the same, because presenting only the severe
@@ -173,13 +174,16 @@ second-model review and both errors in our own favour:
   displacement carried the window's envelope. Peak-to-peak barely moved, because the
   peak lands where the gain is one, which is why it survived. The hold fraction did
   not, and every published rate was too generous.
-- Device-frame acceleration was being read as hand displacement with the gyroscope
-  sitting unused in every record.
+- Then, in the round that reviewed *that* fix: an attitude filter we had just added
+  assumed the accelerometer carried gravity. This one does not. It reported 73 degrees
+  of tilt on a stationary wrist, and every test passed because every test injected a
+  1 g vector it had built itself.
 
-Correcting both made the finding **stronger**: median hold of a 24 px target went from
-74% to 58%, and tremors wider than the whole target from 37 to 41 of 52.
+The second is the one worth reading. **A synthetic test is made out of your
+assumption, so it can never tell you the assumption is false.** Measure the real
+input and assert the precondition.
 
-More, including all eleven, in [`docs/FALSE-GREENS.md`](docs/FALSE-GREENS.md).
+More, including all fourteen, in [`docs/FALSE-GREENS.md`](docs/FALSE-GREENS.md).
 
 ## The phone
 

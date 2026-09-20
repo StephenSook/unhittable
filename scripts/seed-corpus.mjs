@@ -151,7 +151,11 @@ console.log(`robots   ${outcome.skippedRobots.length}`);
 console.log(`failed   ${outcome.failed.length}`);
 
 if (pool) {
-  const { aggregate: a } = await db.corpusSummary(pool);
+  // Rows from a superseded default recording are stale duplicates of the same
+  // pages, not extra evidence. Clear them before reporting.
+  const stale = await pool.query('DELETE FROM scans WHERE in_corpus AND recording_id <> $1', [recording.id]);
+  if (stale.rowCount) console.log(`cleared ${stale.rowCount} corpus rows from a superseded recording`);
+  const { aggregate: a } = await db.corpusSummary(pool, recording.id);
   console.log('\n--- the published number ---');
   console.log(`${a.sites} sites, ${a.targets} interactive controls measured`);
   console.log(`fail SC 2.5.8 outright          : ${a.fail_standard} (${(100 * a.fail_standard / a.targets).toFixed(1)}%)`);
