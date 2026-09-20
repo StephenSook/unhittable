@@ -12,7 +12,7 @@ finding. Not the architecture, not the stack. The finding.
 
 ---
 
-## 0:00 to 0:25 — on camera
+## 0:00 to 0:25: on camera
 
 > "Every accessibility checker in the world measures your buttons against one
 > number. Twenty-four pixels. It's in WCAG, it's what axe and Lighthouse check,
@@ -26,7 +26,7 @@ Straight to camera. No slides yet.
 
 ---
 
-## 0:25 to 1:00 — screen, hero (footage 0:00 to 0:22)
+## 0:25 to 1:00: screen, hero (footage 0:00 to 0:22)
 
 > "This is a real recording. A Parkinson's patient, captured on an Apple Watch
 > at a hundred hertz during a neurological exam, published on PhysioNet. We
@@ -40,7 +40,7 @@ Let the target-size sweep play. Do not talk over the moment it starts holding.
 
 ---
 
-## 1:00 to 1:25 — screen, the recordings (footage 0:22 to 0:40)
+## 1:00 to 1:25: screen, the recordings (footage 0:22 to 0:40)
 
 > "We're not showing you the worst case. We measured all 1,560 postural
 > recordings from 260 assessed people. Only fifty-two contain a detectable
@@ -51,7 +51,7 @@ Let the target-size sweep play. Do not talk over the moment it starts holding.
 
 ---
 
-## 1:25 to 2:20 — screen, the scanner (footage 0:40 to 1:05)
+## 1:25 to 2:20: screen, the scanner (footage 0:40 to 1:05)
 
 > "Now the part that makes this a tool instead of a finding. Paste any URL.
 >
@@ -65,7 +65,7 @@ Let the target-size sweep play. Do not talk over the moment it starts holding.
 
 ---
 
-## 2:20 to 3:00 — screen, the corpus (footage 1:05 to 1:16)
+## 2:20 to 3:00: screen, the corpus (footage 1:05 to 1:16)
 
 > "We ran that across thirty-eight sites. Government services, hospitals, the
 > Parkinson's and Alzheimer's foundations, and the accessibility vendors who
@@ -85,7 +85,7 @@ cannot be held.
 
 ---
 
-## 3:00 to 3:40 — on camera, or screen
+## 3:00 to 3:40: on camera, or screen
 
 > "Two things I want to be honest about, because they nearly sank this.
 >
@@ -103,7 +103,7 @@ This is the section that separates you. Do not cut it.
 
 ---
 
-## 3:40 to 4:20 — screen, the phone
+## 3:40 to 4:20: screen, the phone
 
 > "There's an Android build too, and it does the other half. It measures your
 > hand with the phone's own accelerometer, works out the button size you need,
@@ -115,7 +115,7 @@ This is the section that separates you. Do not cut it.
 
 ---
 
-## 4:20 to 4:50 — on camera, close
+## 4:20 to 4:50: on camera, close
 
 > "About ten million people in the US have essential tremor. Another million
 > have Parkinson's. Every one of them is being told by an automated green check
