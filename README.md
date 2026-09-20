@@ -2,7 +2,7 @@
 
 **Live:** https://stephensook.github.io/unhittable/
 **API:** https://unhittable-api.onrender.com/health
-**Android:** [direct APK install](https://expo.dev/artifacts/eas/md9vzJ1v_mV8EPJ8Mzw30tqHqJFAqEY3I0rYFyU0C4c.apk)
+**Android:** [direct APK install](https://expo.dev/artifacts/eas/h84D0L-Z-nlXVSOyeNBSmH3smLo7XjATdjrcVc2ZWj0.apk)
 
 WCAG 2.2 says a button must be at least **24 by 24 CSS pixels**. Every accessibility
 checker on the market measures your buttons against that number and prints a green
