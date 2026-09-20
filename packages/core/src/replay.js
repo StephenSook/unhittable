@@ -5,6 +5,7 @@
 // not compute different ones.
 
 import { parsePadsRecord, accelGToDisplacementMm, tremorSpectrum, peakToPeak, rms, PADS_FS } from './tremor.js';
+import { removeRotation } from './attitude.js';
 
 /** WCAG 2.2 SC 2.5.8 Target Size (Minimum), Level AA. */
 export const WCAG_MIN_PX = 24;
@@ -29,14 +30,29 @@ export function cpiToPxPerMm(cpi) {
 /**
  * Turn one PADS recording into a two-dimensional cursor path in millimetres.
  *
- * Two accelerometer axes, not the magnitude, because a cursor moves in a
- * plane and a button is a rectangle. Using the scalar magnitude would throw
- * away the geometry that decides whether a click lands.
+ * Two axes, not the magnitude, because a cursor moves in a plane and a button
+ * is a rectangle, and collapsing to a scalar would throw away the geometry
+ * that decides whether a click lands.
+ *
+ * The axes are the WORLD horizontal plane, not the device's own. An earlier
+ * version integrated the raw device axes, which silently counted wrist
+ * rotation as hand movement: tilting a watch changes how gravity falls on its
+ * axes, and a five degree oscillation with no translation at all integrates
+ * to 1.75 mm, larger than the median amplitude in our cohort. The gyroscope
+ * that PADS records alongside the accelerometer, and that the first version
+ * of this code never touched, is used to rotate into a fixed frame where
+ * gravity is constant and can be subtracted. See attitude.js.
+ *
+ * The azimuth of that horizontal plane is undetermined, because recovering
+ * compass heading needs a magnetometer. That does not affect a square target
+ * and it does affect a rectangle, so `worstAzimuth` exists for the rectangle
+ * case and the site scanner uses it.
  */
 export function recordingToPath(text, { loHz = 3.5, hiHz = 8, trim = 0.2 } = {}) {
   const r = parsePadsRecord(text);
-  const dxAll = accelGToDisplacementMm(r.ax, PADS_FS, { loHz, hiHz });
-  const dyAll = accelGToDisplacementMm(r.ay, PADS_FS, { loHz, hiHz });
+  const world = removeRotation(r, PADS_FS);
+  const dxAll = accelGToDisplacementMm(world.ex, PADS_FS, { loHz, hiHz });
+  const dyAll = accelGToDisplacementMm(world.ey, PADS_FS, { loHz, hiHz });
 
   // Drop the ends, where the analysis window tapers the signal toward zero.
   const a = Math.floor(r.n * trim);
@@ -56,6 +72,9 @@ export function recordingToPath(text, { loHz = 3.5, hiHz = 8, trim = 0.2 } = {})
     prominence: spec?.prominence ?? null,
     p2pMm: Math.max(peakToPeak(x), peakToPeak(y)),
     rmsMm: Math.max(rms(x), rms(y)),
+    // Published so the correction's effect is visible rather than asserted.
+    tiltDeg: world.tiltDeg,
+    rotationShare: world.rotationShare,
   };
 }
 
