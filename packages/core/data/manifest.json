@@ -19,11 +19,11 @@
       "hz": 6.51,
       "prominence": 2.1,
       "detectable": false,
-      "p2pMm": 0.259,
-      "rmsMm": 0.04,
-      "cursorPxAt800": 8.2,
+      "p2pMm": 0.326,
+      "rmsMm": 0.045,
+      "cursorPxAt800": 10.3,
       "hold24At800": 1,
-      "need95PxAt800": 5
+      "need95PxAt800": 7
     },
     {
       "file": "006_StretchHold_LeftWrist.txt",
@@ -36,11 +36,11 @@
       "hz": 7.4,
       "prominence": 2.5,
       "detectable": false,
-      "p2pMm": 0.904,
-      "rmsMm": 0.182,
-      "cursorPxAt800": 28.5,
-      "hold24At800": 0.9805,
-      "need95PxAt800": 20
+      "p2pMm": 1.321,
+      "rmsMm": 0.23,
+      "cursorPxAt800": 41.6,
+      "hold24At800": 0.8393,
+      "need95PxAt800": 31
     },
     {
       "file": "006_StretchHold_RightWrist.txt",
@@ -53,11 +53,11 @@
       "hz": 5.05,
       "prominence": 22.3,
       "detectable": true,
-      "p2pMm": 4.775,
-      "rmsMm": 1.34,
-      "cursorPxAt800": 150.4,
-      "hold24At800": 0.0731,
-      "need95PxAt800": 136
+      "p2pMm": 13.757,
+      "rmsMm": 3.703,
+      "cursorPxAt800": 433.3,
+      "hold24At800": 0.0179,
+      "need95PxAt800": 357
     },
     {
       "file": "019_HoldWeight_LeftWrist.txt",
@@ -70,11 +70,11 @@
       "hz": 6.02,
       "prominence": 5.6,
       "detectable": true,
-      "p2pMm": 2.024,
-      "rmsMm": 0.47,
-      "cursorPxAt800": 63.7,
-      "hold24At800": 0.4383,
-      "need95PxAt800": 52
+      "p2pMm": 3.633,
+      "rmsMm": 0.751,
+      "cursorPxAt800": 114.4,
+      "hold24At800": 0.0714,
+      "need95PxAt800": 82
     },
     {
       "file": "071_HoldWeight_RightWrist.txt",
@@ -87,11 +87,11 @@
       "hz": 7.08,
       "prominence": 10.4,
       "detectable": true,
-      "p2pMm": 1.912,
-      "rmsMm": 0.493,
-      "cursorPxAt800": 60.2,
-      "hold24At800": 0.4302,
-      "need95PxAt800": 52
+      "p2pMm": 2.64,
+      "rmsMm": 0.771,
+      "cursorPxAt800": 83.2,
+      "hold24At800": 0.1412,
+      "need95PxAt800": 77
     },
     {
       "file": "093_HoldWeight_LeftWrist.txt",
@@ -104,11 +104,11 @@
       "hz": 5.86,
       "prominence": 6.6,
       "detectable": true,
-      "p2pMm": 1.532,
-      "rmsMm": 0.31,
-      "cursorPxAt800": 48.3,
-      "hold24At800": 0.7354,
-      "need95PxAt800": 36
+      "p2pMm": 2.29,
+      "rmsMm": 0.33,
+      "cursorPxAt800": 72.1,
+      "hold24At800": 0.5893,
+      "need95PxAt800": 54
     },
     {
       "file": "124_HoldWeight_LeftWrist.txt",
@@ -121,11 +121,11 @@
       "hz": 4.31,
       "prominence": 25.6,
       "detectable": true,
-      "p2pMm": 4.716,
-      "rmsMm": 1.37,
-      "cursorPxAt800": 148.5,
-      "hold24At800": 0,
-      "need95PxAt800": 134
+      "p2pMm": 14.201,
+      "rmsMm": 3.95,
+      "cursorPxAt800": 447.3,
+      "hold24At800": 0.026,
+      "need95PxAt800": 410
     },
     {
       "file": "222_LiftHold_LeftWrist.txt",
@@ -138,11 +138,11 @@
       "hz": 5.85,
       "prominence": 7.4,
       "detectable": true,
-      "p2pMm": 1.31,
-      "rmsMm": 0.198,
-      "cursorPxAt800": 41.3,
-      "hold24At800": 0.9383,
-      "need95PxAt800": 24
+      "p2pMm": 2.533,
+      "rmsMm": 0.386,
+      "cursorPxAt800": 79.8,
+      "hold24At800": 0.5032,
+      "need95PxAt800": 54
     },
     {
       "file": "228_StretchHold_RightWrist.txt",
@@ -155,11 +155,11 @@
       "hz": 4.19,
       "prominence": 12.9,
       "detectable": true,
-      "p2pMm": 20.143,
-      "rmsMm": 5.86,
-      "cursorPxAt800": 634.4,
-      "hold24At800": 0.0097,
-      "need95PxAt800": 577
+      "p2pMm": 20.71,
+      "rmsMm": 5.427,
+      "cursorPxAt800": 652.3,
+      "hold24At800": 0,
+      "need95PxAt800": 608
     }
   ]
 }

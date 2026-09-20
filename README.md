@@ -11,8 +11,8 @@ tick. The number comes from a 2006 study of able-bodied thumbs on touchscreens.
 We replayed **clinically recorded tremor** against it.
 
 ```
-38 live sites          3,921 interactive controls measured as rendered
-95.9% pass WCAG 2.5.8  73.9% of them cannot be reliably held
+38 live sites          3,918 interactive controls measured as rendered
+95.9% pass WCAG 2.5.8  71.7% of them cannot be reliably held
                        by a MEDIAN clinically recorded tremor
 ```
 
@@ -41,14 +41,14 @@ Paste a URL into the live page and it will do this to your site in about three s
 | Subjects measured | **260** clinically assessed people |
 | Postural recordings analysed | **1,560** |
 | Containing a detectable tremor | **52** (3.3%), from 29 subjects |
-| Median amplitude of those 52 | **2.04 mm**, which is 64 px of cursor travel at 800 cpi |
-| Tremor wider than the whole 24 px target | **45 of 52** |
-| Hold a 24 px target under 95% of the time | **41 of 52** |
-| Miss more often than they hit | **26 of 52** |
-| Still under 95% at the 44 px AAA size | **28 of 52** |
+| Median amplitude of those 52 | **3.05 mm**, which is 96 px of cursor travel at 800 cpi |
+| Tremor wider than the whole 24 px target | **48 of 52** |
+| Hold a 24 px target under 95% of the time | **39 of 52** |
+| Miss more often than they hit | **25 of 52** |
+| Still under 95% at the 44 px AAA size | **30 of 52** |
 
 Across the 38-site corpus the median interactive control is **143 × 30 px**. It passes.
-It is bound by its **height** on 3,417 controls against 244 bound by width, because
+It is bound by its **height** on 3,415 controls against 243 bound by width, because
 the real web is made of wide short buttons and a square minimum structurally cannot
 describe the shape that fails.
 
@@ -85,18 +85,17 @@ everyone.
 
 - **We do not diagnose anyone.** Condition labels are reproduced verbatim from the
   dataset. Nothing here infers one.
-- **The published hold is the WORST azimuth.** Gravity fixes the vertical of our
-  recovered frame; nothing fixes its heading, because the dataset has no
-  magnetometer. A single reading therefore depends on a choice with no physical
-  meaning, and on a wide short control the two ends of that choice differ by up to
-  36 points. Every figure here is the floor across 12 azimuths. The finding barely
-  moves under it, which is the point of checking.
-- **No attitude correction on the clinical path, and that is deliberate.** We built
-  one, shipped it, and removed it again: PADS supplies a **gravity-free**
-  accelerometer channel (mean magnitude 0.001 to 0.14 g, not ~1 g), so the
-  rotation-into-gravity confound has no mechanism here and the filter was deriving
-  orientation from noise. The phone is the opposite case and does apply it. Full
-  write-up as false green 14.
+- **We cannot identify the plane a mouse moves in.** Gyroscope de-rotation leaves a
+  frame that is fixed but arbitrarily oriented, because a gravity-free channel
+  offers nothing to recover a vertical from. Every published figure is therefore
+  the **median across 48 plane projections**, with the worst and best carried as a
+  range. Not the worst: that plane is the one containing the tremor's dominant
+  direction, and publishing it would assume the desk lies along the single most
+  unfavourable axis.
+- **The attitude filter was built, shipped, and removed.** PADS supplies a
+  **gravity-free** accelerometer channel, so a gravity-seeking filter had nothing
+  to work from and reported 73 degrees of tilt on a stationary wrist. The phone is
+  the opposite case and does apply it. Full write-up as false green 14.
 - **Most recordings contain no detectable tremor.** 52 of 1,560. The set shipped on the
   page includes a healthy control that holds a 24 px target 100% of the time, and a
   Parkinson's patient's wrist that does the same, because presenting only the severe

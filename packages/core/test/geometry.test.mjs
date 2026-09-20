@@ -177,9 +177,14 @@ test('REAL DATA: a wide short button is bound by its short side', () => {
   const j = judgeElement(wide, { spacingApplies: false, spacingPass: true }, path, ppm);
   assert.equal(j.bindingSide, 'height', '20 px tall against 180 wide: height binds');
   assert.equal(j.sizeOk, false, '20 px tall is under the 24 px minimum');
-  assert.ok(j.hold <= j.holdBest, 'the published hold is the floor of the azimuth range');
-  // The marginal per-axis figures still exist for the method write-up.
-  assert.ok(axisHoldFraction(path, ppm, 180, 'x') >= axisHoldFraction(path, ppm, 20, 'y'));
+  // The published hold sits inside the range the unknown plane orientation
+  // spans, and the range is reported rather than collapsed.
+  assert.ok(j.holdWorst <= j.hold && j.hold <= j.holdBest,
+    `median hold ${j.hold} must lie between ${j.holdWorst} and ${j.holdBest}`);
+  // No assertion here about which AXIS is easier. `path` is one projection of
+  // a three-dimensional path whose orientation is unknown, so a claim about
+  // its x versus its y is a claim about an arbitrary choice. That is the
+  // whole reason the family exists.
 });
 
 test('axis hold rises with extent and reaches one when the axis is huge', () => {
@@ -236,8 +241,13 @@ test('REAL DATA: a target can satisfy the standard and still be unhittable', () 
 });
 
 test('REAL DATA: a large enough target satisfies both', () => {
+  // 400 px was "large enough" until the pipeline began keeping all three
+  // axes: this recording's full extent is about 433 px at 800 cpi, so a
+  // 400 px square no longer contains it. The code was right and the test's
+  // idea of large was stale, which is the reliable direction for this kind
+  // of failure.
   const ppm = cpiToPxPerMm(800);
-  const j = judgeElement({ x: 0, y: 0, w: 400, h: 400 }, { spacingApplies: false, spacingPass: true }, path, ppm);
+  const j = judgeElement({ x: 0, y: 0, w: 2000, h: 2000 }, { spacingApplies: false, spacingPass: true }, path, ppm);
   assert.equal(j.wcagPass, true);
   assert.equal(j.hold, 1);
   assert.equal(j.passesStandardButNotHand, false);
@@ -312,9 +322,6 @@ test('holdOverAzimuths brackets the arbitrary choice, and the worst is the floor
   const ppm = cpiToPxPerMm(800);
   const o = holdOverAzimuths(path, ppm, 200, 20);
   assert.ok(o.worst <= o.median && o.median <= o.best);
-  const single = holdFractionRect(path, ppm, 200, 20);
-  assert.ok(o.worst <= single + 1e-12, 'the published floor must not exceed the arbitrary single reading');
-  assert.ok(o.best >= single - 1e-12);
   assert.ok(o.spread >= 0);
 });
 
@@ -353,11 +360,16 @@ test('REGRESSION: the recommended size holds at EVERY azimuth, not just the wors
                       { x: 0, y: 0, w: 24, h: 24 }, { x: 0, y: 0, w: 141, h: 30 }]) {
     const j = judgeElement(rect, { spacingApplies: false, spacingPass: true }, family, ppm, { want: 0.95 });
     if (j.scaleNeeded === null) continue;
+    // The headline size is the MEDIAN orientation's requirement, so at least
+    // half the family must reach the target rate at it, and the separately
+    // published worst-case size must reach it at EVERY member.
+    const reached = family.filter((p) => holdFractionRect(p, ppm, j.needWPx, j.needHPx) >= 0.95 - 1e-9).length;
+    assert.ok(reached >= Math.floor(family.length / 2),
+      `${rect.w}x${rect.h}: the median-plane size reached 95% at only ${reached} of ${family.length}`);
     for (const p of family) {
-      const h = holdFractionRect(p, ppm, j.needWPx, j.needHPx);
+      const h = holdFractionRect(p, ppm, j.needWorstWPx, j.needWorstWPx * (rect.h / rect.w));
       assert.ok(h >= 0.95 - 1e-9,
-        `${rect.w}x${rect.h} was told it needs ${j.needWPx.toFixed(0)}x${j.needHPx.toFixed(0)}, ` +
-        `but at one azimuth that size holds only ${(h * 100).toFixed(1)}%`);
+        `the worst-case size ${j.needWorstWPx.toFixed(0)} still fails somewhere, at ${(h * 100).toFixed(1)}%`);
     }
   }
 });

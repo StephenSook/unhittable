@@ -236,9 +236,13 @@ export async function scanUrl({ browser, resolver = new ResolverCache(), guard =
   const rects = probe.targets.map((t) => ({ x: t.x, y: t.y, w: t.w, h: t.h }));
   const spacing = evaluateSpacing(rects);
 
-  // Rotations are computed once for the page rather than once per control,
-  // so a page with eight hundred targets stays fast.
-  const family = azimuthFamily(opts.path, opts.azimuths ?? 12);
+  // Plane projections are computed once per RECORDING, not per control, so a
+  // page with eight hundred targets stays fast. recordingToPath already built
+  // the family, because the plane a pointing device moves in is unknown and
+  // every figure is published across the whole set.
+  const family = opts.path.family?.length
+    ? opts.path.family
+    : azimuthFamily(opts.path, opts.azimuths ?? 12);
 
   const elements = probe.targets.map((t, i) => {
     const j = judgeElement(rects[i], spacing[i], family, pxPerMm, { want });

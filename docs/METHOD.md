@@ -71,34 +71,65 @@ windowed here and the recovered displacement carried the window's shape: a
 true 2.000 mm amplitude read as 0.778 mm one fifth of the way into the record.
 Peak-to-peak barely moved, because the peak lands near the middle where the
 gain is one, which is exactly why it survived review. What it corrupted was
-the hold fraction. See `docs/FALSE-GREENS.md`.
+the hold fraction. See `docs/FALSE-GREENS.md` entry 12.
 
-**Rotation is removed first, using the gyroscope.** An accelerometer at rest
-reads gravity projected onto its own axes, so a wrist that rotates in place
-and translates not at all still produces a tremor-band signal as the share of
-gravity on each axis changes. It is not a small effect: a five degree
-oscillation at 5 Hz with zero translation integrates to **1.75 mm**, larger
-than the median amplitude across this cohort. PADS records a synchronised
-gyroscope and the first version of this project never used it. Acceleration is
-now rotated into a world frame where gravity is constant and subtracted there,
-so rotation cancels and translation survives. See `packages/core/src/attitude.js`.
+**Tapered band edges.** The band limits are a raised cosine, not a brick wall.
+A square cutoff rings, and a tone near the edge comes back with the ringing
+added to it: at 7.87 Hz against an 8 Hz edge a true 4.000 mm was recovered as
+4.663 mm, a 16.6 percent **over**-estimate. Over-estimating is the unsafe
+direction, because it inflates our own finding, and detected tremors run right
+up to 8 Hz. The taper takes the worst error across a dense sweep of the
+production band from 16.57 percent to 4.30. A DC floor is explicit rather than
+incidental, because the integration divides by (2*pi*f)^2 and the brick wall
+had been zeroing that bin only as a side effect.
 
-**Validation, and it is executable.** Every figure below is produced by
-`node scripts/validate.mjs`, which CI runs, so a regression fails the build
-rather than the reader. An earlier version of this document quoted accuracy
-figures that no code in the repository computed, which is a claim rather than
-a measurement.
+## 3a. The frame, which took three attempts
 
-| what | result |
-|---|---|
-| amplitude recovery, 3.5 to 12 Hz and 0.1 to 20 mm | worst error **2.40%** |
-| flatness across the retained window | ratio 0.996 to 1.011, no envelope |
-| frequency recovery | error under **0.002 Hz** |
-| rotation rejection, tilt with zero translation | **6.3x**, at every tilt from 1 to 10 degrees |
+This is the part of the method that changed most, and all three versions are
+recorded because the sequence is the useful bit.
 
-The rejection figure is constant across tilt because the artefact and the
-residual both scale linearly with angle, which is what a correct correction
-looks like and is itself a check.
+**Attempt one: integrate the device's own axes.** Wrong, because the device
+rotates. Over ten seconds a turning wrist smears real acceleration between x,
+y and z, so integrating raw axes as though they were a fixed plane mixes the
+signal with itself. Correcting it changes amplitude on the shipped recordings
+by -7 to +51 percent.
+
+**Attempt two: a gravity-seeking attitude filter.** Also wrong, and worse. A
+Mahony complementary filter uses the accelerometer to find an absolute
+vertical, so it needs a channel that carries gravity. **PADS does not.** Its
+accelerometer is already gravity-free, like CoreMotion's `userAcceleration`:
+mean magnitude across these recordings is 0.001 to 0.14 g, never the ~1 g a
+gravity-bearing channel shows. The filter declared a few thousandths of a g of
+noise to be gravity and reported **73 degrees of tilt on a stationary wrist**.
+Every test passed, because every test injected a 1 g vector it had built
+itself. `removeRotation` now refuses a gravity-free channel by name.
+
+**Attempt three, and what ships: gyroscope-only de-rotation.** Integrating the
+gyroscope from identity, with no accelerometer feedback, removes the
+time-varying rotation and needs no gravity. What it cannot do is say which way
+the resulting frame points, because the initial orientation is unknown and
+nothing in the data recovers it.
+
+So the output is a frame that is **fixed but arbitrarily oriented**, and all
+three axes are kept, because the out-of-plane component is large and was
+previously discarded in silence. The total angle swept is published per
+recording, so a reader can judge how much work the de-rotation did and how
+much accumulated gyro bias to suspect.
+
+**The plane is then swept, not guessed.** A pointing device moves in one
+particular plane and we cannot identify it. Every published figure is
+therefore computed across **48 plane projections**, with normals spread over a
+hemisphere and two in-plane rotations each, and the **median** is published
+with the worst and best carried as a range.
+
+The median rather than the worst, deliberately: the worst plane is the one
+containing the tremor's dominant direction, and publishing it would assume the
+desk happens to lie along the single most unfavourable axis. That is a real
+possibility, not a typical one. The same reasoning chose a median recording
+over the strongest one.
+
+**Amplitude** is the largest extent in any direction in space, which is
+invariant to all of this, rather than the larger of two arbitrary projections.
 
 ## 4. Millimetres to pixels
 

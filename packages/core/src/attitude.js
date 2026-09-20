@@ -199,3 +199,62 @@ export function removeRotation(rec, fs, { kp = 0.5, requireGravity = true } = {}
     rotationShare: totEnergy > 0 ? rotEnergy / totEnergy : 0,
   };
 }
+
+/**
+ * Remove time-varying rotation WITHOUT needing gravity.
+ *
+ * `removeRotation` above uses the accelerometer to find an absolute vertical,
+ * so it needs a channel that carries gravity. A gravity-free channel has no
+ * absolute reference at all, and this project's clinical data is exactly
+ * that. But the axes still rotate, and that is a separate problem: over ten
+ * seconds a turning wrist smears real acceleration between x, y and z, so
+ * integrating the raw device axes as though they were a fixed plane mixes the
+ * signal with itself.
+ *
+ * Integrating the gyroscope alone, from identity, removes that mixing. What
+ * it cannot do is say which way the resulting frame points, because the
+ * initial orientation is unknown and there is nothing to recover it from. So
+ * the output is a FIXED frame of arbitrary orientation, which is strictly
+ * better than a rotating one and strictly worse than a world frame, and the
+ * published figures treat the remaining ambiguity by sweeping it.
+ *
+ * Drift: with no correction term, gyro bias accumulates. Over a ten to twenty
+ * second postural hold that is small, and `driftDeg` reports how far the
+ * frame moved in total so a caller can judge it rather than assume it.
+ */
+export function derotate(rec, fs) {
+  const n = rec.n ?? rec.ax.length;
+  const dt = 1 / fs;
+  const hasGyro = !!(rec.gx && rec.gy && rec.gz);
+  if (!hasGyro) {
+    const e = new Error('derotate: this record carries no gyroscope, so rotation cannot be removed');
+    e.code = 'NO_GYRO';
+    throw e;
+  }
+
+  let q = [1, 0, 0, 0];
+  const ex = new Float64Array(n), ey = new Float64Array(n), ez = new Float64Array(n);
+  let rate = 0;
+
+  for (let i = 0; i < n; i++) {
+    const wx = rec.gx[i], wy = rec.gy[i], wz = rec.gz[i];
+    rate += Math.hypot(wx, wy, wz) * dt;
+
+    q = qnorm([
+      q[0] + 0.5 * dt * (-q[1] * wx - q[2] * wy - q[3] * wz),
+      q[1] + 0.5 * dt * (q[0] * wx + q[2] * wz - q[3] * wy),
+      q[2] + 0.5 * dt * (q[0] * wy - q[1] * wz + q[3] * wx),
+      q[3] + 0.5 * dt * (q[0] * wz + q[1] * wy - q[2] * wx),
+    ]);
+
+    const a = rotate(q, [rec.ax[i], rec.ay[i], rec.az[i]]);
+    ex[i] = a[0]; ey[i] = a[1]; ez[i] = a[2];
+  }
+
+  return {
+    ex, ey, ez, n, fs,
+    // Total angle swept, in degrees. Large values mean the de-rotation is
+    // doing real work and that accumulated bias deserves more suspicion.
+    sweptDeg: (rate * 180) / Math.PI,
+  };
+}

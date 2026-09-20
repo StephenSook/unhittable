@@ -315,11 +315,56 @@ caught this before any of it was written.
 
 ---
 
+## 15. A generator that did not perform the method its own output described
+
+**What it said.** `cohort.json` carried a field stating that every hold was
+the floor across twelve azimuths, and the README repeated it.
+
+**What was wrong.** `scripts/cohort.mjs` computed hold from **one raw path**.
+It never called `azimuthFamily`, `holdOverAzimuths` or `extentOverAzimuths`.
+The generator had been written before the azimuth work and was never updated,
+while the sentence describing it was added to the output file by hand.
+
+On recording 071 the single-projection hold was 51.9% and the swept worst was
+41.9%: ten points, on a published number, between what the file said and what
+produced it.
+
+**Why it survived.** The output looked generated, because it was. Nothing in
+a JSON file says which code path wrote each field, and a description sitting
+next to a number inherits the number's credibility.
+
+**Prevented by.** The generator now calls `recordingToPath`, the same function
+the product uses, rather than reimplementing the measurement. A generator that
+does not call the product's code will eventually describe a different product.
+
+---
+
+## 16. Two names for the same corpus, counted twice
+
+**What it said.** 7,723 interactive controls. A large, plausible number.
+
+**What was wrong.** The truth was 3,842. The scan cache key includes the
+recording id, so re-pinning the default recording created a second set of rows
+for the same pages instead of replacing them, and the corpus aggregate had no
+recording filter.
+
+**Why it survived for a whole run.** A doubled number does not look wrong. It
+looks impressive. Every per-site figure was correct, the total was simply the
+sum of two runs, and nothing in the output hinted at a second generation.
+
+**Prevented by.** `corpusSummary` takes a recording id and scopes to it, and
+the seeder deletes rows from a superseded recording before reporting. The
+guard fired on the next run and said so.
+
+
+---
+
 ## The pattern
 
-Twelve of these fourteen produced **no error**. Most produced a number that was
-the right shape, in the right units, in the right range. The recurring defences
-are:
+Fourteen of these sixteen produced **no error**. Most produced a number that
+was the right shape, in the right units, in the right range. Several produced a
+number that looked *better* than the truth, which is the hardest kind to go
+looking for. The recurring defences are:
 
 1. **Two independent renderings of the same quantity**, so they can disagree.
 2. **A guard proven to fire**, by planting the thing it is supposed to catch,
@@ -339,3 +384,6 @@ are:
 7. **Asserting the precondition against the real input.** A synthetic test is
    built out of your assumptions, so it can never tell you the assumption is
    false. Measure the actual file.
+8. **Making the generator call the product.** Entry 15 existed because a script
+   reimplemented the measurement and then drifted from it while still
+   describing it accurately in prose.

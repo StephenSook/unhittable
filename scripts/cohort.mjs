@@ -23,8 +23,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parsePadsRecord, accelGToDisplacementMm, tremorSpectrum, peakToPeak, rms, PADS_FS } from '../packages/core/src/tremor.js';
-import { holdFractionRect, cpiToCssPxPerMm, WCAG_MIN_PX, WCAG_ENHANCED_PX } from '../packages/core/src/geometry.js';
-import { scaleForHoldRect } from '../packages/core/src/geometry.js';
+import { recordingToPath } from '../packages/core/src/replay.js';
+import {
+  holdFractionRect, cpiToCssPxPerMm, WCAG_MIN_PX, WCAG_ENHANCED_PX,
+  scaleForHoldRect, azimuthFamily, extentOverAzimuths,
+} from '../packages/core/src/geometry.js';
 
 const args = process.argv.slice(2);
 const argOf = (flag, dflt) => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : dflt; };
@@ -60,6 +63,9 @@ const EXCLUDED_WITH_REASON = {
 const PROMINENCE_BAR = 5;
 
 const CPIS = [200, 400, 800, 1200, 1600];
+// How many rotations of the horizontal plane to consider. The frame's heading
+// is not recoverable, so every published figure is the floor across these.
+const AZIMUTHS = 12;
 const SIZES = [24, 32, 44, 64, 96, 128, 192, 256];
 
 function quantile(sorted, q) {
@@ -90,37 +96,26 @@ function loadConditions(dir) {
   return map;
 }
 
-/** One recording, measured. Returns null when the file is unreadable. */
+/**
+ * One recording, measured THROUGH THE SHIPPED PIPELINE.
+ *
+ * This used to reimplement the measurement, and it drifted: the generator was
+ * computing hold from one raw projection while its own output file said the
+ * figures were the floor across a family. A generator that does not call the
+ * product's code will eventually describe a different product.
+ */
 function measure(file, band) {
   const text = fs.readFileSync(file, 'utf8');
-  let r;
-  try { r = parsePadsRecord(text); } catch { return null; }
-  if (!r || r.n < 256) return null;
-
-  // Detection runs on the acceleration magnitude, which is orientation
-  // independent, so a differently worn watch cannot change whether a tremor
-  // is found.
-  const magnitude = Float64Array.from({ length: r.n }, (_, i) => Math.hypot(r.ax[i], r.ay[i], r.az[i]));
-  const spec = tremorSpectrum(magnitude, PADS_FS, band);
-  if (!spec) return null;
-
-  // Displacement is recovered per axis, because a cursor moves in a plane and
-  // a button is a rectangle. No attitude correction: PADS ships a
-  // gravity-free accelerometer channel, so the rotation-into-gravity confound
-  // has no mechanism here, and the frame's arbitrary heading is handled in
-  // geometry.js by publishing the worst hold across azimuths.
-  const dx = accelGToDisplacementMm(r.ax, PADS_FS, band);
-  const dy = accelGToDisplacementMm(r.ay, PADS_FS, band);
-  const a = Math.floor(r.n * 0.2), b = Math.ceil(r.n * 0.8);   // drop the tapered ends
-  const x = dx.slice(a, b), y = dy.slice(a, b);
-
+  let p;
+  try { p = recordingToPath(text, { loHz: band.loHz, hiHz: band.hiHz, planes: AZIMUTHS * 2 }); }
+  catch { return null; }
+  if (!p || !p.n || p.prominence === null) return null;
   return {
-    hz: spec.hz, prominence: spec.prominence,
-    p2pMm: Math.max(peakToPeak(x), peakToPeak(y)),
-    rmsMm: Math.max(rms(x), rms(y)),
-    path: { x, y, n: x.length, fs: PADS_FS, seconds: x.length / PADS_FS },
-    samples: r.n,
-    gravityG: r.gravityG,
+    hz: p.hz, prominence: p.prominence,
+    p2pMm: p.p2pMm, rmsMm: p.rmsMm,
+    path: p, family: p.family,
+    sweptDeg: p.sweptDeg, gravityG: p.gravityG,
+    samples: p.n,
   };
 }
 
@@ -133,25 +128,47 @@ function run(band, bandLabel, conditions, files) {
       subject, task, wrist,
       condition: conditions.get(subject) ?? 'Unknown',
       hz: m.hz, prominence: m.prominence, p2pMm: m.p2pMm, rmsMm: m.rmsMm,
-      samples: m.samples, path: m.path,
+      samples: m.samples, path: m.path, family: m.family,
+      sweptDeg: m.sweptDeg, gravityG: m.gravityG,
     });
   }
 
   const clearing = rows.filter((r) => r.prominence >= PROMINENCE_BAR);
 
   // The pointing outcome, for every clearing recording, at every sensitivity.
+  //
+  // THE AZIMUTH TREATMENT IS APPLIED HERE, not merely described. An earlier
+  // version of this generator computed hold from ONE raw path while the
+  // output file and the README both said the figures were the floor across
+  // twelve azimuths. They were not, and on recording 071 the difference was
+  // ten points of hold. A generator that does not perform the method its own
+  // output claims is the worst kind of drift, because the number looks
+  // produced rather than asserted.
   for (const r of clearing) {
+    const family = r.family;
+    // Amplitude is already the invariant three-dimensional extent.
+    r.extentMm = r.p2pMm;
     r.pointing = {};
     for (const cpi of CPIS) {
       const ppm = cpiToCssPxPerMm(cpi);
+      // MEDIAN across the plane family, matching what the product publishes.
+      const medianHold = (px) => {
+        const hs = family.map((p) => holdFractionRect(p, ppm, px, px)).sort((a, b) => a - b);
+        return hs[Math.floor(hs.length / 2)];
+      };
+      const worstHold = medianHold;
+      const ks = [];
+      for (const p of family) {
+        const k = scaleForHoldRect(p, ppm, WCAG_MIN_PX, WCAG_MIN_PX, 0.95);
+        if (k !== null) ks.push(k);
+      }
+      ks.sort((a, b) => a - b);
+      const need = ks.length === family.length ? ks[Math.floor(ks.length / 2)] : null;
       r.pointing[cpi] = {
         pxPerMm: ppm,
-        p2pPx: r.p2pMm * ppm,
-        hold: Object.fromEntries(SIZES.map((s) => [s, holdFractionRect(r.path, ppm, s, s)])),
-        need95Px: (() => {
-          const k = scaleForHoldRect(r.path, ppm, WCAG_MIN_PX, WCAG_MIN_PX, 0.95);
-          return k === null ? null : WCAG_MIN_PX * k;
-        })(),
+        p2pPx: r.extentMm * ppm,
+        hold: Object.fromEntries(SIZES.map((s) => [s, worstHold(s)])),
+        need95Px: need === null ? null : WCAG_MIN_PX * need,
       };
     }
   }
@@ -185,20 +202,22 @@ function run(band, bandLabel, conditions, files) {
     clearRate: rows.length ? clearing.length / rows.length : 0,
     subjectsClearing: new Set(clearing.map((r) => r.subject)).size,
     byCondition,
-    amplitudeMm: describe(clearing.map((r) => r.p2pMm)),
+    amplitudeMm: describe(clearing.map((r) => r.extentMm)),
+    amplitudeSingleAxisMm: describe(clearing.map((r) => r.p2pMm)),
     frequencyHz: describe(clearing.map((r) => r.hz)),
-    cursorExcursionPx800: describe(clearing.map((r) => r.p2pMm * ppm800)),
+    cursorExcursionPx800: describe(clearing.map((r) => r.extentMm * ppm800)),
     hold24At800: describe(holds24),
     hold44At800: describe(holds44),
     // The counts a reader actually needs, rather than a mean that hides them.
     below95At24: holds24.filter((h) => h < 0.95).length,
     below50At24: holds24.filter((h) => h < 0.5).length,
     below95At44: holds44.filter((h) => h < 0.95).length,
-    exceedsWholeTarget24: clearing.filter((r) => r.p2pMm * ppm800 > 24).length,
+    exceedsWholeTarget24: clearing.filter((r) => r.extentMm * ppm800 > 24).length,
     records: clearing
       .map((r) => ({
         subject: r.subject, condition: r.condition, task: r.task, wrist: r.wrist,
-        hz: r.hz, prominence: r.prominence, p2pMm: r.p2pMm, rmsMm: r.rmsMm,
+        hz: r.hz, prominence: r.prominence, p2pMm: r.p2pMm, extentMm: r.extentMm, rmsMm: r.rmsMm,
+        sweptDeg: r.sweptDeg,
         pointing: Object.fromEntries(Object.entries(r.pointing).map(([k, v]) => [k, {
           p2pPx: v.p2pPx, hold: v.hold, need95Px: v.need95Px,
         }])),
@@ -250,6 +269,7 @@ const out = {
     rotationCorrection: 'None, deliberately. A gyroscope-based attitude correction was built and then removed: PADS ships a gravity-free accelerometer channel (mean magnitude 0.001 to 0.14 g, not ~1 g), so the rotation-into-gravity confound has no mechanism here and the filter was deriving attitude from noise. The frame\'s arbitrary heading is handled instead by publishing the worst hold across azimuths.',
     amplitudeWindow: 'No taper is applied on the displacement path. A Hann window is correct for spectral estimation and wrong for amplitude reconstruction, because the envelope is never removed; an earlier version carried it into the result and inflated every hold rate.',
     cpiSwept: CPIS,
+    planes: `Gyroscope de-rotation leaves a frame that is fixed but of unknown orientation, so every hold and every required size is the MEDIAN across ${AZIMUTHS * 2} plane projections rather than a single guess. The worst plane is the one containing the tremor's dominant direction and is carried as the bottom of a range rather than as the headline. Amplitude is the largest extent in any direction in space.`,
   },
   primary,
   sensitivity: wide,

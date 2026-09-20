@@ -13,14 +13,14 @@ Generated: 2026-09-20
 | Subjects measured | 260 |
 | Postural recordings analysed | 1,560 |
 | Containing a detectable tremor | 52 (3.3%), from 29 subjects |
-| Median amplitude of those | 2.04 mm |
-| Median cursor travel at 800 cpi | 64.4 px |
-| Largest measured | 20.14 mm |
-| Wider than the whole 24 px target | 45 of 52 |
-| Hold a 24 px target under 95% of the time | 41 of 52 |
-| Miss more often than they hit | 26 of 52 |
-| Still under 95% at the 44 px AAA size | 28 of 52 |
-| Median hold of a 24 px target | 52% |
+| Median amplitude of those | 3.05 mm |
+| Median cursor travel at 800 cpi | 96.1 px |
+| Largest measured | 23.73 mm |
+| Wider than the whole 24 px target | 48 of 52 |
+| Hold a 24 px target under 95% of the time | 39 of 52 |
+| Miss more often than they hit | 25 of 52 |
+| Still under 95% at the 44 px AAA size | 30 of 52 |
+| Median hold of a 24 px target | 54% |
 
 Highest detection rate by condition: Essential Tremor at 14.6%.
 
@@ -28,10 +28,10 @@ Highest detection rate by condition: Essential Tremor at 14.6%.
 
 | | |
 |---|---|
-| Subject | 019 (Parkinson's) |
-| Task | holding a weight, arms out, left wrist |
-| Frequency | 6.02 Hz |
-| Amplitude | 2.024 mm, which is 63.7 px at 800 cpi |
+| Subject | 071 (Parkinson's) |
+| Task | holding a weight, arms out, right wrist |
+| Frequency | 7.08 Hz |
+| Amplitude | 2.64 mm, which is 83.2 px at 800 cpi |
 | Rank among the 52 detected tremors | median |
 
 ## The corpus
@@ -39,16 +39,16 @@ Highest detection rate by condition: Essential Tremor at 14.6%.
 | | |
 |---|---|
 | Sites measured | 38 |
-| Interactive controls | 3,921 |
+| Interactive controls | 3,918 |
 | Pass WCAG 2.5.8 | 95.9% |
-| Fail it outright | 159 (4.1%) |
-| Pass it and cannot be held | 2897 (73.9%) |
-| Held under 95% of the time | 3057 (78.0%) |
-| Missed more often than hit | 1582 (40.3%) |
-| Bound by height | 3417 |
-| Bound by width | 244 |
+| Fail it outright | 160 (4.1%) |
+| Pass it and cannot be held | 2810 (71.7%) |
+| Held under 95% of the time | 2971 (75.8%) |
+| Missed more often than hit | 1783 (45.5%) |
+| Bound by height | 3415 |
+| Bound by width | 243 |
 | Median control | 143 by 30 px |
-| Median hold | 62% |
+| Median hold | 56% |
 
 ## Method accuracy
 
@@ -57,4 +57,4 @@ See that script's output for the current figures.
 
 ## One-line summary
 
-38 live sites, 3,921 interactive controls: 95.9% pass WCAG 2.5.8 and 73.9% of those cannot be reliably held by a median clinically recorded tremor.
+38 live sites, 3,918 interactive controls: 95.9% pass WCAG 2.5.8 and 71.7% of those cannot be reliably held by a median clinically recorded tremor.

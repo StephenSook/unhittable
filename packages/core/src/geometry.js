@@ -8,7 +8,10 @@
 // Everything here is pure: rectangles in, numbers out. It is imported by the
 // browser, by the scan API and by the test suite from the same file.
 
-import { holdFraction } from './replay.js';
+// No import from replay.js on purpose. replay.js now depends on this module
+// for the plane family, and a cycle between them leaves whichever loads
+// second holding undefined bindings, which surfaces as "x is not iterable"
+// rather than as an import error.
 
 /** WCAG 2.2 SC 2.5.8 Target Size (Minimum), Level AA. */
 export const WCAG_MIN_PX = 24;
@@ -272,34 +275,37 @@ export function judgeElement(rect, spacing, pathOrPaths, pxPerMm, { want = 0.95 
   // the page rather than once per element.
   const paths = Array.isArray(pathOrPaths) ? pathOrPaths : [pathOrPaths];
 
-  let worst = Infinity, best = -Infinity;
-  for (const p of paths) {
-    const h = holdFractionRect(p, pxPerMm, rect.w, rect.h);
-    if (h < worst) worst = h;
-    if (h > best) best = h;
-  }
+  // THE ORIENTATION OF THE PLANE A MOUSE MOVES IN IS UNKNOWN.
+  //
+  // After gyroscope de-rotation the frame is fixed but arbitrarily oriented,
+  // because a gravity-free channel offers nothing to recover a vertical from.
+  // `paths` is therefore a family of plane projections, and a single one of
+  // them is a guess rather than a measurement.
+  //
+  // The PUBLISHED figure is the MEDIAN of the family, not the worst. The
+  // worst plane is the one containing the tremor's dominant direction, and
+  // reporting it would assume the desk happens to lie along the single most
+  // unfavourable axis. That is a real possibility, not a typical one, so it
+  // is carried as the bottom of a published range instead of as the headline.
+  // The same reasoning chose a median recording over the strongest one.
+  const holds = paths.map((p) => holdFractionRect(p, pxPerMm, rect.w, rect.h)).sort((a, b) => a - b);
+  const hold = holds[Math.floor(holds.length / 2)];
+  const worst = holds[0];
+  const best = holds[holds.length - 1];
 
-  // The PUBLISHED hold is the worst azimuth. Our frame has a well-determined
-  // vertical, from gravity, and an arbitrary rotation about it, because no
-  // magnetometer is available to fix a heading. A single reading therefore
-  // depends on a choice that carries no physical meaning, and for a wide
-  // short control the two ends of that choice can differ by thirty points.
-  // An accessibility floor takes the unlucky alignment.
-  const hold = worst;
-
-  // THE SIZE RECOMMENDATION NEEDS ITS OWN MAXIMUM, not the scale of whichever
-  // azimuth happened to hold worst at the CURRENT size. Those are different
-  // questions: the angle that is hardest right now need not be the angle that
-  // demands the most enlargement, because the two orderings can cross as the
-  // rectangle grows. Taking the first answer published a size that failed at
-  // some other azimuth, which is the one thing a size recommendation must not
-  // do.
-  let scale = null;
+  // The size recommendation takes the MEDIAN plane's requirement to match the
+  // headline, and reports the maximum separately. It must not be the scale of
+  // whichever plane held worst at the CURRENT size: the orderings cross as a
+  // rectangle grows, so that published a size which failed at some other
+  // orientation, which is the one thing a size recommendation must not do.
+  const scales = [];
   for (const p of paths) {
     const k = scaleForHoldRect(p, pxPerMm, rect.w, rect.h, want);
-    if (k === null) { scale = null; break; }
-    if (scale === null || k > scale) scale = k;
+    if (k !== null) scales.push(k);
   }
+  scales.sort((a, b) => a - b);
+  const scale = scales.length === paths.length ? scales[Math.floor(scales.length / 2)] : null;
+  const scaleWorst = scales.length === paths.length ? scales[scales.length - 1] : null;
 
   return {
     wPx: rect.w,
@@ -309,6 +315,7 @@ export function judgeElement(rect, spacing, pathOrPaths, pxPerMm, { want = 0.95 
     spacingPass: spacing.spacingPass,
     wcagPass,
     hold,
+    holdWorst: worst,
     holdBest: best,
     // How much the unknowable azimuth is worth on this control, published so
     // the uncertainty is visible instead of hidden inside a single number.
@@ -320,6 +327,9 @@ export function judgeElement(rect, spacing, pathOrPaths, pxPerMm, { want = 0.95 
     scaleNeeded: scale,
     needWPx: scale === null ? null : rect.w * scale,
     needHPx: scale === null ? null : rect.h * scale,
+    // What the least favourable orientation would demand, published so the
+    // headline recommendation is not mistaken for a guarantee.
+    needWorstWPx: scaleWorst === null ? null : rect.w * scaleWorst,
     passesStandardButNotHand: wcagPass && hold < want,
   };
 }
@@ -334,6 +344,90 @@ export function azimuthFamily(path, steps = 12) {
   const out = [];
   for (let k = 0; k < steps; k++) out.push(rotatePath(path, (Math.PI * k) / steps));
   return out;
+}
+
+/**
+ * Project a three-dimensional path onto a family of PLANES.
+ *
+ * Why this replaces a plain azimuth sweep for the clinical data: after
+ * gyroscope de-rotation the frame is fixed but its orientation is unknown,
+ * because a gravity-free channel offers nothing to recover an absolute
+ * vertical from. A pointing device moves in one particular plane, and we
+ * cannot say which of the device's planes that is.
+ *
+ * Sweeping azimuth alone answers a narrower question: it assumes the plane is
+ * already the right one and only its heading is unknown. That was the
+ * assumption an earlier version made, and it is not available here.
+ *
+ * So the family spans plane ORIENTATIONS, using normals spread evenly over a
+ * hemisphere by the Fibonacci construction, with two in-plane rotations each
+ * to catch anisotropy. Publishing the worst member makes every figure a
+ * floor: whichever plane the hand really moved a mouse in, the real answer is
+ * at least this bad.
+ *
+ * It also means the out-of-plane component is never silently discarded, which
+ * is what integrating raw device x and y had been doing.
+ */
+export function planeFamily(path3, count = 24) {
+  const n = path3.n;
+  const out = [];
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  const normals = Math.max(1, Math.round(count / 2));
+
+  for (let i = 0; i < normals; i++) {
+    // Hemisphere only: a plane and its mirror give the same projection.
+    const z = (i + 0.5) / normals;
+    const r = Math.sqrt(Math.max(0, 1 - z * z));
+    const th = golden * i;
+    const nz = [r * Math.cos(th), r * Math.sin(th), z];
+
+    // Any vector not parallel to the normal gives a starting basis.
+    const seed = Math.abs(nz[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
+    let u = [
+      seed[1] * nz[2] - seed[2] * nz[1],
+      seed[2] * nz[0] - seed[0] * nz[2],
+      seed[0] * nz[1] - seed[1] * nz[0],
+    ];
+    const ul = Math.hypot(u[0], u[1], u[2]) || 1;
+    u = [u[0] / ul, u[1] / ul, u[2] / ul];
+    const v = [
+      nz[1] * u[2] - nz[2] * u[1],
+      nz[2] * u[0] - nz[0] * u[2],
+      nz[0] * u[1] - nz[1] * u[0],
+    ];
+
+    for (const phi of [0, Math.PI / 4]) {
+      const c = Math.cos(phi), sn = Math.sin(phi);
+      const a = [u[0] * c + v[0] * sn, u[1] * c + v[1] * sn, u[2] * c + v[2] * sn];
+      const b = [-u[0] * sn + v[0] * c, -u[1] * sn + v[1] * c, -u[2] * sn + v[2] * c];
+      const x = new Float64Array(n), y = new Float64Array(n);
+      for (let k = 0; k < n; k++) {
+        x[k] = path3.x[k] * a[0] + path3.y[k] * a[1] + path3.z[k] * a[2];
+        y[k] = path3.x[k] * b[0] + path3.y[k] * b[1] + path3.z[k] * b[2];
+      }
+      out.push({ x, y, n, fs: path3.fs, seconds: path3.seconds });
+    }
+  }
+  return out;
+}
+
+/** The largest extent in ANY direction in three dimensions. */
+export function extent3D(path3, samples = 64) {
+  let worst = 0;
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  for (let i = 0; i < samples; i++) {
+    const z = 1 - (2 * (i + 0.5)) / samples;
+    const r = Math.sqrt(Math.max(0, 1 - z * z));
+    const th = golden * i;
+    const d = [r * Math.cos(th), r * Math.sin(th), z];
+    let lo = Infinity, hi = -Infinity;
+    for (let k = 0; k < path3.n; k++) {
+      const v = path3.x[k] * d[0] + path3.y[k] * d[1] + path3.z[k] * d[2];
+      if (v < lo) lo = v; if (v > hi) hi = v;
+    }
+    if (hi - lo > worst) worst = hi - lo;
+  }
+  return worst;
 }
 
 /** Roll a page's per-element verdicts into the numbers a report leads with. */
@@ -357,6 +451,6 @@ export function summarise(judged, { want = 0.95 } = {}) {
 
 /** Square-target convenience, so the page and the report share one function. */
 export function holdSquare(path, pxPerMm, sizePx) {
-  return holdFraction(path, pxPerMm, sizePx);
+  return holdFractionRect(path, pxPerMm, sizePx, sizePx);
 }
 

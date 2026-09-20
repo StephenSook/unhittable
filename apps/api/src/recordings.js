@@ -33,8 +33,8 @@ export function loadRecordings() {
 /**
  * The recording a scan uses when the caller does not choose one.
  *
- * Subject 019 is the MEDIAN of the 52 detected tremors by amplitude, rank 26
- * of 52 at 1.878 mm against a cohort median of 1.881 mm.
+ * Subject 071 is the MEDIAN of the 52 detected tremors by amplitude, rank 26
+ * of 52 at 2.640 mm against a cohort median of 3.053 mm.
  *
  * The obvious default was subject 006, the second cleanest tremor in the
  * whole 1,560-recording set, and publishing the corpus figure on it would
@@ -44,7 +44,7 @@ export function loadRecordings() {
  * is only approximately the median makes the word "median" a lie. It is
  * checked against the regenerated cohort rather than assumed to have held.
  */
-export const DEFAULT_RECORDING = '019_HoldWeight_LeftWrist';
+export const DEFAULT_RECORDING = '071_HoldWeight_RightWrist';
 
 export function getRecording(id) {
   const { byId } = loadRecordings();

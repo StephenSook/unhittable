@@ -5,6 +5,8 @@
 // not compute different ones.
 
 import { parsePadsRecord, accelGToDisplacementMm, tremorSpectrum, peakToPeak, rms, PADS_FS } from './tremor.js';
+import { derotate } from './attitude.js';
+import { planeFamily, extent3D } from './geometry.js';
 
 /** WCAG 2.2 SC 2.5.8 Target Size (Minimum), Level AA. */
 export const WCAG_MIN_PX = 24;
@@ -33,7 +35,7 @@ export function cpiToPxPerMm(cpi) {
  * is a rectangle, and collapsing to a scalar would throw away the geometry
  * that decides whether a click lands.
  *
- * ON THE FRAME, AND ON A CORRECTION THAT WAS REMOVED AGAIN.
+ * ON THE FRAME, AND ON TWO CORRECTIONS: ONE REMOVED, ONE KEPT.
  *
  * A rotating accelerometer that carries gravity fabricates apparent movement,
  * because tilting changes how much gravity falls on each axis. That is real,
@@ -47,34 +49,73 @@ export function cpiToPxPerMm(cpi) {
  * confound's mechanism is absent, and the filter that was supposed to remove
  * it was deriving attitude from noise. See docs/FALSE-GREENS.md entry 14.
  *
- * What remains true is that the device's axes are not fixed in space, so
- * which way "x" points is arbitrary. That is handled where it actually
- * matters, in geometry.js, by publishing the worst hold across azimuths
- * rather than by pretending a heading is known.
+ * What removing gravity does NOT do is make the frame inertial. The wrist
+ * still turns, so over ten seconds real acceleration is smeared between x, y
+ * and z, and integrating the raw device axes as though they were a fixed
+ * plane mixes the signal with itself. Measured on the shipped recordings,
+ * correcting that changes amplitude by -7% to +51%.
+ *
+ * So the gyroscope IS used, just not for what it was used for before: it
+ * removes time-varying rotation without any accelerometer feedback, which
+ * needs no gravity. The result is a frame that is fixed but of unknown
+ * orientation, and the remaining ambiguity is swept rather than assumed away.
+ * All three axes are kept, because the out-of-plane component was being
+ * silently discarded and it is large.
  */
-export function recordingToPath(text, { loHz = 3.5, hiHz = 8, trim = 0.2 } = {}) {
+export function recordingToPath(text, { loHz = 3.5, hiHz = 8, trim = 0.2, planes = 24 } = {}) {
   const r = parsePadsRecord(text);
-  const dxAll = accelGToDisplacementMm(r.ax, PADS_FS, { loHz, hiHz });
-  const dyAll = accelGToDisplacementMm(r.ay, PADS_FS, { loHz, hiHz });
+
+  // Gyroscope only, from identity, no accelerometer feedback: this removes
+  // the rotation without needing an absolute vertical the data cannot supply.
+  let src = { ex: r.ax, ey: r.ay, ez: r.az }, sweptDeg = null;
+  try { const d = derotate(r, PADS_FS); src = d; sweptDeg = d.sweptDeg; }
+  catch { /* no gyroscope: fall back to device axes and report it */ }
+
+  const dxAll = accelGToDisplacementMm(src.ex, PADS_FS, { loHz, hiHz });
+  const dyAll = accelGToDisplacementMm(src.ey, PADS_FS, { loHz, hiHz });
+  const dzAll = accelGToDisplacementMm(src.ez, PADS_FS, { loHz, hiHz });
 
   // Drop the ends, where the analysis window tapers the signal toward zero.
   const a = Math.floor(r.n * trim);
   const b = Math.ceil(r.n * (1 - trim));
   const x = dxAll.slice(a, b);
   const y = dyAll.slice(a, b);
+  const z = dzAll.slice(a, b);
 
   const magnitude = Float64Array.from({ length: r.n }, (_, i) => Math.hypot(r.ax[i], r.ay[i], r.az[i]));
   const spec = tremorSpectrum(magnitude, PADS_FS, { loHz, hiHz });
 
+  const path3 = { x, y, z, n: x.length, fs: PADS_FS, seconds: x.length / PADS_FS };
+  const family = planeFamily(path3, planes);
+
+  // A pointing device moves in one particular plane and we cannot say which
+  // of these it is, so the 2D path shown on screen is the family member with
+  // the LARGEST excursion, and every published figure is the floor across all
+  // of them. Showing the largest and publishing the smallest is deliberate:
+  // the picture should not be milder than the claim.
+  let show = family[0], showExtent = -1;
+  for (const f of family) {
+    const e = Math.max(peakToPeak(f.x), peakToPeak(f.y));
+    if (e > showExtent) { showExtent = e; show = f; }
+  }
+
   return {
-    x, y,
+    x: show.x, y: show.y,
     n: x.length,
     fs: PADS_FS,
     seconds: x.length / PADS_FS,
     hz: spec?.hz ?? null,
     prominence: spec?.prominence ?? null,
-    p2pMm: Math.max(peakToPeak(x), peakToPeak(y)),
-    rmsMm: Math.max(rms(x), rms(y)),
+    // Rotation invariant: the largest extent in any direction in space,
+    // rather than the larger of two arbitrary projections.
+    p2pMm: extent3D(path3),
+    rmsMm: Math.max(rms(x), rms(y), rms(z)),
+    path3,
+    family,
+    // Total angle the wrist swept, in degrees. Large values mean the
+    // de-rotation did real work and that accumulated gyro bias deserves more
+    // suspicion, so it is published rather than hidden.
+    sweptDeg,
     // The accelerometer channel's mean magnitude, published because it is
     // what decides whether an attitude correction is even applicable.
     gravityG: r.gravityG ?? null,

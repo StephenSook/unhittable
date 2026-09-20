@@ -39,7 +39,7 @@
   <h1>Unhittable</h1>
   <p style="font-size:30px;max-width:44ch;margin-top:30px">
     WCAG says a button must be <b>24 pixels</b>. We replayed <em>52 clinically recorded tremors</em>
-    against that number, then measured <b>3,921 real controls</b> on 38 live sites.
+    against that number, then measured <b>3,918 real controls</b> on 38 live sites.
   </p>
   <div class="foot"><span>stephensook.github.io/unhittable</span><span>github.com/StephenSook/unhittable</span></div>
 </section>
@@ -74,25 +74,25 @@
   <p>Only <b>52</b> contain a tremor that clears a bar <em>zero of 2,300 null draws</em> reach.
      Most recordings have none, and we publish that.</p>
   <div class="grid g4">
-    <div class="c"><div class="v">2.04<span style="font-size:22px"> mm</span></div><div class="l">median amplitude of the 52, which is 64 px of cursor travel</div></div>
-    <div class="c"><div class="v bad">45</div><div class="l">of 52 are wider than the entire 24 px target</div></div>
-    <div class="c"><div class="v bad">41</div><div class="l">hold a 24 px target less than 95% of the time</div></div>
-    <div class="c"><div class="v bad">28</div><div class="l">still fail at the 44 px AAA enhanced size</div></div>
+    <div class="c"><div class="v">3.05<span style="font-size:22px"> mm</span></div><div class="l">median amplitude of the 52, which is 96 px of cursor travel</div></div>
+    <div class="c"><div class="v bad">48</div><div class="l">of 52 are wider than the entire 24 px target</div></div>
+    <div class="c"><div class="v bad">39</div><div class="l">hold a 24 px target less than 95% of the time</div></div>
+    <div class="c"><div class="v bad">30</div><div class="l">still fail at the 44 px AAA enhanced size</div></div>
   </div>
   <div class="foot"><span>essential tremor has the highest detection rate, 14.6%, and affects ~10x more people than Parkinson's</span><span>03</span></div>
 </section>
 
 <section class="s">
   <p class="k">Then we pointed it at the web</p>
-  <h2>38 live sites. 3,921 controls.</h2>
+  <h2>38 live sites. 3,918 controls.</h2>
   <p>Government services, healthcare, the disease organisations whose own audiences have tremor,
      and the accessibility vendors who sell the audits.</p>
   <div class="grid g3">
     <div class="c"><div class="v ok">95.9%</div><div class="l">PASS WCAG 2.5.8, including the spacing exception</div></div>
-    <div class="c"><div class="v bad">73.9%</div><div class="l">of those cannot be reliably held by a median recorded tremor</div></div>
+    <div class="c"><div class="v bad">71.7%</div><div class="l">of those cannot be reliably held by a median recorded tremor</div></div>
     <div class="c"><div class="v">143<span style="font-size:24px">&times;</span>30</div><div class="l">the median control on the web, in CSS pixels</div></div>
   </div>
-  <div class="foot"><span>bound by HEIGHT on 3,417 controls, by width on 244</span><span>04</span></div>
+  <div class="foot"><span>bound by HEIGHT on 3,415 controls, by width on 243</span><span>04</span></div>
 </section>
 
 <section class="s">
@@ -132,7 +132,7 @@
   <h2>An adversarial review nearly killed this.</h2>
   <table class="rows">
     <tr><td>A Hann window never removed</td><td>a true 2.000 mm read as 0.778 mm at the record's edge</td></tr>
-    <tr><td>Then: we fixed a confound the data lacks</td><td>the filter assumed gravity; PADS ships none, and reported 73&deg; of tilt on a still wrist</td></tr>
+    <tr><td>Then: a fix for a confound the data lacks</td><td>the filter assumed gravity; PADS ships none, and reported 73&deg; of tilt on a still wrist</td></tr>
     <tr><td>A robots.txt matcher</td><td>silently excluded 18 of 40 sites, all wrongly</td></tr>
     <tr><td>DNS rebinding in the scanner</td><td>two lookups, and an attacker answers them differently</td></tr>
   </table>
