@@ -132,3 +132,21 @@ test('rms and peakToPeak agree with hand arithmetic on a sinusoid', () => {
   assert.ok(Math.abs(rms(x) - 3 / Math.SQRT2) < 0.01, `rms ${rms(x)}`);
   assert.ok(Math.abs(peakToPeak(x) - 6) < 0.01, `p2p ${peakToPeak(x)}`);
 });
+
+test('tremorSpectrum returns the curve it took its peak from', () => {
+  // A frequency quoted without its spectrum asks a reader to take the peak on
+  // trust. The curve has to be the SAME data the peak came from, so the peak
+  // must sit at the curve's maximum inside the analysis band.
+  const fs = 100, n = 1024, f0 = 5.0;
+  const x = Float64Array.from({ length: n }, (_, i) => 0.05 * Math.sin(2 * Math.PI * f0 * i / fs));
+  const s = tremorSpectrum(x, fs, { loHz: 2, hiHz: 15 });
+  assert.ok(s, 'a clean 5 Hz tone must be detected');
+  assert.ok(Array.isArray(s.curve) && s.curve.length > 20, 'the curve must be populated');
+  assert.ok(s.curve.every((c) => Number.isFinite(c.hz) && Number.isFinite(c.mag)));
+  assert.ok(s.curve[s.curve.length - 1].hz <= 15 + s.hzPerBin, 'the curve must stop at the analysis ceiling');
+
+  const peak = s.curve.reduce((a, b) => (b.mag > a.mag ? b : a));
+  assert.ok(Math.abs(peak.hz - s.hz) <= 2 * s.hzPerBin,
+    `the reported peak ${s.hz.toFixed(2)} Hz must coincide with the curve maximum ${peak.hz.toFixed(2)} Hz`);
+  assert.ok(Math.abs(s.hz - f0) < 0.2, `recovered ${s.hz.toFixed(2)} Hz for a ${f0} Hz input`);
+});

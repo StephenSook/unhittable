@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Unhittable — the accessibility number nobody checked</title>
+<meta name="description" content="WCAG says a button must be 24 pixels. We replayed 52 clinically recorded tremors against one. 37 are wider than the whole target. Paste a URL and measure your own site.">
+<meta property="og:title" content="Unhittable">
+<meta property="og:description" content="Watch a clinically recorded tremor try to click your website. The WCAG minimum gets held 16% of the time.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<a class="skip" href="#scanner">Skip to the scanner</a>
+
+<div class="rail" role="region" aria-label="Live measurement summary">
+  <div class="rail-track" aria-hidden="true">
+    <div class="rail-seg" id="railA"></div>
+    <div class="rail-seg" id="railB"></div>
+  </div>
+  <p class="vh" id="railText">Loading the recording.</p>
+</div>
+
+<main>
+
+<!-- ============================ HERO ============================ -->
+<section class="hero wrap">
+  <div class="hero-grid">
+    <div>
+      <p class="micro">WCAG 2.2 · Success Criterion 2.5.8 · Level AA</p>
+      <h1 class="display" style="margin-top:20px">
+        Watch a real tremor<br>try to click<br><em>a passing button.</em>
+      </h1>
+
+      <p class="lede" style="margin-top:30px">
+        Every accessibility checker on the market measures your buttons against
+        <strong>24 by 24 pixels</strong> and prints a green tick. That number comes from a 2006
+        study of able-bodied thumbs on touchscreens.
+      </p>
+      <p class="lede" style="margin-top:16px">
+        On the right is a clinically recorded hand, replayed at true scale against a button of
+        exactly the size the standard permits. It is not a simulation and there is no intensity
+        slider. Nothing here is generated.
+      </p>
+
+      <div class="stat-row">
+        <div class="stat">
+          <div class="stat-v bad num" id="sHold">—</div>
+          <div class="stat-k">of the time this hand is inside a conforming 24&nbsp;px target</div>
+        </div>
+        <div class="stat">
+          <div class="stat-v num" id="sNeed">—</div>
+          <div class="stat-k">pixels it would actually need to stay on target 95% of the time</div>
+        </div>
+        <div class="stat">
+          <div class="stat-v num" id="sCohort">—</div>
+          <div class="stat-k">of 52 measured tremors are wider than the entire 24&nbsp;px target</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================= THE INSTRUMENT ========================= -->
+    <div class="panel" id="instrument">
+      <div class="panel-head">
+        <p class="micro" style="margin:0">Live · real recording</p>
+        <p class="micro" style="margin:0" id="recLabel">—</p>
+      </div>
+      <div class="panel-body">
+        <div class="stage" id="stage">
+          <canvas class="trailc" id="trail" aria-hidden="true"></canvas>
+          <button class="target" id="target" type="button" tabindex="-1" aria-hidden="true">
+            <span id="targetLabel">24px</span>
+          </button>
+          <div class="cursor" id="cursor" data-inside="false"></div>
+        </div>
+
+        <div class="verdict">
+          <div class="verdict-v bad num" id="liveHold">—</div>
+          <div>
+            <p class="micro" style="margin:0">clicks that would land</p>
+            <p style="margin:4px 0 0; font-size:14px" id="liveNote">measuring…</p>
+          </div>
+        </div>
+
+        <div class="controls">
+          <div class="ctl">
+            <label for="size">
+              <span class="micro" style="color:var(--ink-2)">Target size</span>
+              <span class="val"><span id="sizeVal">24</span> px</span>
+            </label>
+            <input id="size" type="range" min="12" max="240" step="2" value="24" aria-describedby="sizeHelp">
+            <p id="sizeHelp" class="micro" style="margin:2px 0 0; text-transform:none; letter-spacing:0">
+              24 is the AA minimum. 44 is the AAA enhanced size.
+            </p>
+          </div>
+          <div class="ctl">
+            <label for="cpi">
+              <span class="micro" style="color:var(--ink-2)">Mouse sensitivity</span>
+              <span class="val"><span id="cpiVal">800</span> cpi</span>
+            </label>
+            <input id="cpi" type="range" min="200" max="1600" step="100" value="800" aria-describedby="cpiHelp">
+            <p id="cpiHelp" class="micro" style="margin:2px 0 0; text-transform:none; letter-spacing:0">
+              Swept, not assumed. The hand-to-pixel mapping is genuinely undetermined.
+            </p>
+          </div>
+        </div>
+
+        <div style="margin-top:20px">
+          <p class="micro" style="margin:0 0 9px">Recording</p>
+          <div class="seg" id="picker" role="group" aria-label="Choose a recording"></div>
+        </div>
+
+        <div class="seg" style="margin-top:18px">
+          <button class="btn ghost" id="playBtn" type="button" aria-pressed="true">Pause motion</button>
+          <button class="btn ghost" id="snapBtn" type="button">Reset to 24 px</button>
+        </div>
+
+        <p aria-live="polite" class="vh" id="live"></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ============================ THE SCANNER ============================ -->
+<section class="wrap" id="scanner">
+  <p class="micro">The instrument, pointed at your site</p>
+  <h2 style="margin-top:18px; max-width:20ch">Now measure a page you are responsible for.</h2>
+  <p style="margin-top:22px; max-width:66ch">
+    Paste any public URL. A real Chromium loads it, waits for the fonts, finds every button, link
+    and field, and measures each one <em>as rendered</em>. Then it replays the recording against
+    each rectangle and reports how often that hand would stay inside it.
+    <strong>Target size is a layout property</strong>, so there is no way to answer this by reading
+    the HTML. The page has to be laid out and measured.
+  </p>
+
+  <form class="scan-form" id="scanForm">
+    <label class="vh" for="scanUrl">URL to scan</label>
+    <input class="scan-input" id="scanUrl" type="url" inputmode="url" spellcheck="false"
+           placeholder="https://example.gov" aria-describedby="scanHelp">
+    <button class="btn primary" id="scanBtn" type="submit">Scan this page</button>
+  </form>
+  <p id="scanHelp" class="micro" style="margin-top:10px; text-transform:none; letter-spacing:0; color:var(--dim)">
+    Public pages only. Private addresses, cloud metadata endpoints and anything that is not a web
+    page are refused before a browser opens.
+  </p>
+
+  <div class="presets" id="presets" aria-label="Sites already measured"></div>
+
+  <div class="filters" role="group" aria-label="Scan options">
+    <button class="chip" id="optDesktop" type="button" aria-pressed="true">Desktop, 1280 px</button>
+    <button class="chip" id="optMobile" type="button" aria-pressed="false">Mobile, 390 px</button>
+  </div>
+
+  <div id="scanOut" aria-live="polite"></div>
+</section>
+
+<hr class="rule">
+
+<!-- ============================ THE CORPUS ============================ -->
+<section class="wrap" id="corpus">
+  <p class="micro">What we already measured</p>
+  <h2 style="margin-top:18px; max-width:22ch">The web, against one recorded hand.</h2>
+  <p style="margin-top:22px; max-width:64ch">
+    A defined list of sites where being unable to click has a consequence: government services,
+    healthcare, the disease organisations whose own audiences have tremor, and the accessibility
+    vendors who sell the audits. Every figure below is recomputed from stored measurements, and the
+    list is committed to the repository so the set cannot be quietly curated after the fact.
+  </p>
+  <div class="corpus-grid" id="corpusGrid"></div>
+  <div class="tablewrap" style="margin-top:34px"><div id="corpusTable"></div></div>
+</section>
+
+<hr class="rule">
+
+<!-- ============================ THE COHORT ============================ -->
+<section class="wrap" id="cohort">
+  <p class="micro">Provenance</p>
+  <h2 style="margin-top:18px; max-width:22ch">260 people, not one flattering recording.</h2>
+
+  <div class="cols" style="margin-top:34px">
+    <div>
+      <p>
+        Every accessibility simulator on the market generates tremor from a parameter. You drag a
+        control labelled intensity and the cursor wobbles. Nothing about it came from a human being.
+      </p>
+      <p>
+        These recordings came from people with a diagnosis, captured on an Apple Watch Series 4 at
+        100&nbsp;Hz during a standardised neurological assessment and published on PhysioNet. We
+        measured <strong>all 1,560 postural recordings from 260 assessed people</strong>, not the
+        one that makes the best argument.
+      </p>
+      <p>
+        That mattered. The recording this page opens with turns out to be the second cleanest in the
+        entire set, and presenting it alone would have been true of that person and misleading about
+        everyone else. <strong>Only 3.3% of recordings contain a detectable tremor at all.</strong>
+        The distribution is below, including the part that weakens the claim.
+      </p>
+      <p>
+        <strong>We do not diagnose anyone.</strong> Condition labels are reproduced from the
+        dataset. Nothing here infers one.
+      </p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><p class="micro" style="margin:0">Selected recording</p></div>
+      <div class="panel-body">
+        <dl id="meta" style="margin:0; display:grid; grid-template-columns:auto 1fr; gap:11px 20px; font-size:14.5px"></dl>
+        <canvas id="spectrum" width="900" height="200" class="chart" style="margin-top:22px"
+                role="img" aria-labelledby="specCap"></canvas>
+        <p id="specCap" class="micro" style="margin-top:10px; text-transform:none; letter-spacing:0; line-height:1.5">
+          Frequency content of the recording. The peak is the tremor. The shaded band is the
+          published parkinsonian rest-tremor range, 4 to 7 hertz.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="corpus-grid" id="cohortGrid" style="margin-top:38px"></div>
+
+  <div style="margin-top:44px">
+    <canvas class="chart" id="chart" width="1200" height="520" role="img" aria-labelledby="chartCap"></canvas>
+    <p id="chartCap" style="margin-top:14px; font-size:14.5px">
+      Hit rate against target size for the selected recording, one line per mouse sensitivity. The
+      marker at 24 px is the AA minimum, the marker at 44 px is the AAA enhanced size. The same
+      data is in the table below.
+    </p>
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <div class="tablewrap" style="margin-top:32px">
+    <table id="sweep">
+      <caption id="sweepCaption">Fraction of time the cursor is inside the target. Computed in your browser, now, from the committed recording.</caption>
+      <thead><tr id="sweepHead"></tr></thead>
+      <tbody id="sweepBody"></tbody>
+    </table>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ============================ METHOD ============================ -->
+<section class="wrap" id="method">
+  <p class="micro">How, and what we are not claiming</p>
+  <h2 style="margin-top:18px; max-width:24ch">The physics is not ours. The measurement is.</h2>
+
+  <div class="cols cols-3" style="margin-top:38px">
+    <div class="note">
+      <h3>Acceleration to distance</h3>
+      <p>
+        A watch measures acceleration; a pointing task cares about distance. For roughly sinusoidal
+        motion the two are related exactly, so we integrate twice in the frequency domain, where
+        integration is a division rather than a running sum. Summing twice in time turns any small
+        offset into a parabola. Band-limiting to the clinical tremor range removes that singularity
+        before it can do damage.
+      </p>
+    </div>
+    <div class="note">
+      <h3>Millimetres to pixels</h3>
+      <p>
+        A mouse at 800 cpi moves the cursor <strong>31.5 pixels per millimetre</strong> of hand
+        movement. A finger on a 96 dpi screen covers 3.8. Those differ by 8.3x and using the screen
+        figure for a pointing task understates every result, which is a mistake we made once and
+        caught. The mapping also depends on the operating system, so it is swept rather than
+        asserted.
+      </p>
+    </div>
+    <div class="note">
+      <h3>The generous reading</h3>
+      <p>
+        Our metric assumes the person has <em>already aimed perfectly</em> and charges the tremor
+        only for the wobble around that aim. Real pointing is harder, because acquiring the target
+        is the difficult part. We chose the most forgiving measure available so the result cannot
+        be dismissed as a pessimistic model.
+      </p>
+    </div>
+  </div>
+
+  <h3 style="margin-top:56px">What already exists, so nobody has to catch us</h3>
+  <div class="cols" style="margin-top:22px">
+    <div>
+      <p class="cite"><strong>SUPPLE++</strong> (Gajos, Wobbrock &amp; Weld, UIST 2007; CHI 2008)
+        computed a per-user minimum target size in pixels and beat manufacturer defaults by 26% on
+        speed. It derives size from expected movement time, on a desktop, from a motor test that
+        took motor-impaired participants 30 to 90 minutes.</p>
+      <p class="cite"><strong>ABD-MT</strong> (Kong, Zhong, Fogarty &amp; Wobbrock, MobileHCI 2024)
+        ships open-source code that enlarges a keyboard when a user has tremor, and argues against
+        "a single minimum target size" exactly as we do. Its tremor signal is a boolean from touch
+        variability, and the size comes from finger footprint, not from an amplitude.</p>
+      <p class="cite"><strong>Sarcar et&nbsp;al.</strong> (IEEE Pervasive Computing, 2018) maps
+        tremor amplitude in centimetres to key size in dp. The amplitudes are population values
+        taken from the literature; the authors name measuring the individual as future work.</p>
+    </div>
+    <div>
+      <p class="cite"><strong>axe-core and Lighthouse</strong> check target size against a flat
+        constant. axe-core's own rule page names "people who have mobility impairments such as hand
+        tremors" as the beneficiaries, and then applies 24&nbsp;px to everyone.</p>
+      <p class="cite"><strong>Funkify</strong> and other simulators have a tremor mode. It is
+        synthetic, parameterised and qualitative, designed to build empathy rather than to produce
+        a number.</p>
+      <p class="cite"><strong>Measuring your own tremor is a solved problem.</strong> StudyMyTremor
+        has reported amplitude in millimetres from a phone since 2016, and a dozen apps do
+        something similar. We are not claiming that part.</p>
+      <p class="cite"><strong>The 24 px number</strong> traces to Parhi, Karlson &amp; Bederson,
+        MobileHCI 2006, a one-handed thumb study of able-bodied participants. The 44 px AAA figure
+        is platform convention. <strong>The data</strong> is PADS (Varghese et&nbsp;al., npj
+        Parkinson's Disease, 2024), on PhysioNet under CC BY-NC-SA 4.0.</p>
+    </div>
+  </div>
+
+  <div class="notice calm" style="margin-top:34px">
+    <div>
+      <strong>What is actually new here.</strong> Not measuring tremor, and not the idea that target
+      size should adapt to a person. It is the join nobody has published: taking
+      <em>clinically recorded</em> tremor, in physical units, and evaluating
+      <em>WCAG 2.5.8 itself</em> against it, on <em>pages that are actually shipping</em>.
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<footer class="wrap">
+  <div class="cols">
+    <div>
+      <p class="micro">Built for SASEhack 2026</p>
+      <p style="margin-top:14px; font-size:15px">
+        Every figure on this page is recomputed in your browser from recordings committed to the
+        repository. Nothing is precomputed and nothing is synthetic.
+      </p>
+      <div class="seg" style="margin-top:20px">
+        <a class="btn ghost" href="https://github.com/StephenSook/unhittable">Source and method</a>
+        <a class="btn ghost" href="#method">What we are not claiming</a>
+      </div>
+    </div>
+    <div>
+      <p class="micro">This page against its own standard</p>
+      <p style="margin-top:14px; font-size:15px" id="selfTest">Measuring our own controls…</p>
+    </div>
+  </div>
+</footer>
+
+</main>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

@@ -13,6 +13,7 @@
 //      database is unreachable, scanning still works and only the corpus
 //      endpoints say so.
 
+import { pathToFileURL } from 'node:url';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
@@ -23,7 +24,7 @@ import * as db from './db.js';
 import { normaliseTargetUrl } from '@unhittable/core/url-guard.js';
 import { WCAG_MIN_PX, WCAG_ENHANCED_PX } from '@unhittable/core/geometry.js';
 
-const PORT = Number(process.env.PORT || 8787);
+const PORT = Number(process.env.PORT || 8791);
 const HOST = process.env.HOST || '0.0.0.0';
 const MAX_CONCURRENT_SCANS = Number(process.env.MAX_CONCURRENT_SCANS || 2);
 const CACHE_HOURS = Number(process.env.CACHE_HOURS || 24);
@@ -215,7 +216,12 @@ export async function build({ logger = true } = {}) {
 
 // Only start a server when run directly, so the test suite can build the app
 // without binding a port.
-if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+//
+// pathToFileURL rather than string concatenation: import.meta.url is
+// percent-encoded, so a repository path containing a space compares unequal
+// to `file://` + argv[1] and the server silently never listens. That failure
+// mode prints nothing at all, which is the worst kind.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const app = await build();
   await app.listen({ port: PORT, host: HOST });
   // Pay the Chromium start-up cost now rather than on a visitor's first scan.

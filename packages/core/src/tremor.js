@@ -110,7 +110,15 @@ export function tremorSpectrum(accel, fs, { loHz = 3, hiHz = 15 } = {}) {
   const hiBin = Math.min(mag.length - 2, Math.round(hiHz / hzPerBin));
   const p = prominentPeak(mag.subarray(0, hiBin + 2), nfft, { loBin, baselineHalfWidth: 30 });
   if (!p) return null;
-  return { hz: p.cyclesPerSample * fs, prominence: p.prominence, hzPerBin };
+
+  // The curve is returned so a page can DRAW the spectrum it is quoting a
+  // peak from. A frequency printed without its spectrum asks the reader to
+  // trust that a peak exists; showing the curve lets them see it, or see
+  // that it does not.
+  const curve = [];
+  for (let b = 1; b <= hiBin; b++) curve.push({ hz: b * hzPerBin, mag: mag[b] });
+
+  return { hz: p.cyclesPerSample * fs, prominence: p.prominence, hzPerBin, curve };
 }
 
 /** Root-mean-square of a trace, which for displacement is the usual summary. */
