@@ -102,7 +102,7 @@ function renderHeadline() {
   const k = scaleForHoldRect(state.current.path, ppm, WCAG_MIN_PX, WCAG_MIN_PX, 0.95);
 
   $('sHold').textContent = pct(hold);
-  $('sNeed').textContent = k === null ? '—' : Math.round(WCAG_MIN_PX * k);
+  $('sNeed').textContent = k === null ? '·' : Math.round(WCAG_MIN_PX * k);
   $('sCohort').textContent = `${state.cohort.primary.exceedsWholeTarget24} of ${state.cohort.primary.clearing}`;
   $('recLabel').textContent = `subject ${meta.subject} · ${meta.condition ?? 'unlabelled'}`;
 
@@ -312,7 +312,7 @@ function renderSweep() {
       return `<td class="num ${cls}">${pct(v)}</td>`;
     }).join('');
     return `<tr><th scope="row" class="num">${cpi} cpi</th>${cells}` +
-      `<td class="num">${k === null ? '—' : Math.round(WCAG_MIN_PX * k) + ' px'}</td></tr>`;
+      `<td class="num">${k === null ? '·' : Math.round(WCAG_MIN_PX * k) + ' px'}</td></tr>`;
   }).join('');
 
   $('sweepCaption').textContent =
@@ -491,7 +491,7 @@ function renderScan(d) {
       <div class="score"><div class="score-v num">${s.n}</div><div class="score-k">interactive controls measured, as rendered</div></div>
       <div class="score"><div class="score-v num ${failStandard ? 'bad' : 'good'}">${failStandard}</div><div class="score-k">fail WCAG 2.5.8, including the spacing exception</div></div>
       <div class="score"><div class="score-v num bad">${s.passesStandardButNotHand}</div><div class="score-k">pass the standard and still cannot be held</div></div>
-      <div class="score"><div class="score-v num">${s.medianHold === null ? '—' : pct(s.medianHold)}</div><div class="score-k">median chance a click lands, for this hand</div></div>
+      <div class="score"><div class="score-v num">${s.medianHold === null ? '·' : pct(s.medianHold)}</div><div class="score-k">median chance a click lands, for this hand</div></div>
     </div>
 
     <div class="filters" role="group" aria-label="Filter the controls below">
@@ -529,8 +529,8 @@ function renderScan(d) {
         <td class="num">${Math.round(e.w)}&times;${Math.round(e.h)}</td>
         <td>${badge}</td>
         <td><div class="holdbar"><div class="holdbar-track"><div class="holdbar-fill" style="width:${(e.hold * 100).toFixed(1)}%;background:${colour}"></div></div><span class="num">${pct(e.hold)}</span></div></td>
-        <td class="num">${e.limitingAxis === 'y' ? 'height' : e.limitingAxis === 'x' ? 'width' : '—'}</td>
-        <td class="num">${e.needWPx ? `${Math.round(e.needWPx)}&times;${Math.round(e.needHPx)}` : '—'}</td>
+        <td class="num">${e.limitingAxis === 'y' ? 'height' : e.limitingAxis === 'x' ? 'width' : '·'}</td>
+        <td class="num">${e.needWPx ? `${Math.round(e.needWPx)}&times;${Math.round(e.needHPx)}` : '·'}</td>
       </tr>`;
     }).join('') || '<tr><td colspan="6" style="color:var(--dim)">Nothing in this category.</td></tr>';
   };
@@ -556,7 +556,7 @@ async function loadCorpus() {
     data = await r.json();
   } catch {
     $('corpusGrid').innerHTML =
-      `<div class="score"><div class="score-v num">—</div><div class="score-k">The corpus service is asleep. Everything else on this page is computed in your browser and still works.</div></div>`;
+      `<div class="score"><div class="score-v num">·</div><div class="score-k">The corpus service is asleep. Everything else on this page is computed in your browser and still works.</div></div>`;
     return;
   }
   const a = data.aggregate;
@@ -586,7 +586,7 @@ async function loadCorpus() {
         <td class="num">${s.n_targets}</td>
         <td class="num">${s.n_targets - s.n_wcag_pass}</td>
         <td class="num" style="color:var(--alarm)">${s.n_standard_not_hand}</td>
-        <td class="num">${s.median_hold === null ? '—' : pct(Number(s.median_hold))}</td>
+        <td class="num">${s.median_hold === null ? '·' : pct(Number(s.median_hold))}</td>
       </tr>`).join('')}</tbody>
     </table>`;
 }
