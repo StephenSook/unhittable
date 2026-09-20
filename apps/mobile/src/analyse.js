@@ -38,14 +38,28 @@ export function analyse(grid, { mmPerDp }) {
   // to the device axes and SAY SO rather than pretending.
   const body = { n: grid.n, ax: toG(grid.x), ay: toG(grid.y), az: toG(grid.z),
                  gx: grid.gx, gy: grid.gy, gz: grid.gz };
-  let ex, ey, rotationCorrected = false, gravityG = null, tiltDeg = null;
-  try {
-    const world = removeRotation(body, grid.fs);
-    ex = world.ex; ey = world.ey;
-    rotationCorrected = true; gravityG = world.gravityG; tiltDeg = world.tiltDeg;
-  } catch (e) {
+  let ex, ey, rotationCorrected = false, gravityG = null, tiltDeg = null, reason = null;
+  if (!grid.hasGyro) {
+    // No rotation data arrived, so rotation CANNOT be separated from
+    // movement. Zero-filled arrays would sail through the filter and let it
+    // report a correction it did not perform.
     ex = body.ax; ey = body.ay;
-    gravityG = e.gravityG ?? null;
+    reason = 'no gyroscope data arrived';
+  } else {
+    try {
+      const world = removeRotation(body, grid.fs);
+      ex = world.ex; ey = world.ey;
+      rotationCorrected = true; gravityG = world.gravityG; tiltDeg = world.tiltDeg;
+    } catch (e) {
+      // Only the expected precondition failure falls back. Anything else is
+      // a real fault and must not be dressed up as a measurement.
+      if (e.code !== 'NO_GRAVITY' && e.code !== 'NO_GYRO') throw e;
+      ex = body.ax; ey = body.ay;
+      gravityG = e.gravityG ?? null;
+      reason = e.code === 'NO_GRAVITY'
+        ? `the accelerometer channel carried no gravity (${(e.gravityG ?? 0).toFixed(3)} g), so orientation could not be found`
+        : 'no gyroscope available';
+    }
   }
 
   const magnitude = Float64Array.from({ length: grid.n }, (_, i) =>
@@ -86,6 +100,7 @@ export function analyse(grid, { mmPerDp }) {
     measuredHz: grid.measuredHz,
     belowNyquist: grid.belowNyquist,
     rotationCorrected,
+    rotationSkippedReason: reason,
     hasGyro: grid.hasGyro,
     gravityG,
     tiltDeg,

@@ -29,7 +29,9 @@
 //    already gravity-free, but this one does, so the gyroscope is recorded
 //    alongside and used to rotate into a frame where gravity is constant.
 
+import { Platform } from 'react-native';
 import { DeviceMotion } from 'expo-sensors';
+import { rotationRateToBodyAxes, hasRotationRate } from './axes.js';
 
 export const G = 9.80665;
 export const TARGET_HZ = 100;
@@ -57,7 +59,7 @@ export function record({ seconds = DURATION_S, onProgress } = {}) {
       if (timer) { clearInterval(timer); timer = null; }
     };
 
-    const DEG = Math.PI / 180;
+    let sawRotation = false;
     sub = DeviceMotion.addListener((d) => {
       // accelerationIncludingGravity is the field present on every platform,
       // and it is the one we want: the attitude filter needs gravity in order
@@ -66,13 +68,11 @@ export function record({ seconds = DURATION_S, onProgress } = {}) {
       if (!a || typeof a.x !== 'number') return;
       t.push(Date.now() - started);
       ax.push(a.x); ay.push(a.y); az.push(a.z ?? 0);
-      // expo reports rotationRate in DEGREES per second; the core works in
-      // radians. Getting this wrong by 57x would not throw, it would just
-      // produce a confidently wrong correction.
-      const r = d.rotationRate;
-      gx.push(r ? (r.beta ?? 0) * DEG : 0);
-      gy.push(r ? (r.gamma ?? 0) * DEG : 0);
-      gz.push(r ? (r.alpha ?? 0) * DEG : 0);
+      // Platform-dependent axis mapping and degrees to radians, both
+      // verified against the installed native source. See axes.js.
+      if (hasRotationRate(d.rotationRate)) sawRotation = true;
+      const w = rotationRateToBodyAxes(d.rotationRate, Platform.OS);
+      gx.push(w.x); gy.push(w.y); gz.push(w.z);
     });
 
     timer = setInterval(() => {
@@ -86,7 +86,7 @@ export function record({ seconds = DURATION_S, onProgress } = {}) {
       if (elapsed >= seconds) {
         stop();
         if (t.length < 64) return reject(new Error(`Only ${t.length} samples arrived in ${seconds} seconds. The sensor is not delivering data.`));
-        const hasGyro = gx.some((v) => v !== 0) || gy.some((v) => v !== 0) || gz.some((v) => v !== 0);
+        const hasGyro = sawRotation;
         resolve({ t, ax, ay, az, gx, gy, gz, hasGyro, seconds: elapsed });
       }
     }, 100);

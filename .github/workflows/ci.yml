@@ -36,7 +36,7 @@ jobs:
       - name: Unit and integration tests
         run: |
           set -o pipefail
-          node --test packages/core/test/*.mjs apps/api/test/*.test.mjs > test-output.txt 2>&1
+          node --test packages/core/test/*.mjs apps/api/test/*.test.mjs apps/mobile/test/*.test.mjs > test-output.txt 2>&1
           status=$?
           cat test-output.txt
           exit $status
@@ -50,7 +50,7 @@ jobs:
           echo "pass=$pass fail=$fail"
           test -n "$pass" || { echo "could not read a pass count; the suite did not report"; exit 1; }
           test "$fail" = "0" || { echo "$fail failing tests"; exit 1; }
-          test "$pass" -ge 120 || { echo "only $pass tests ran, expected at least 120; tests have gone missing"; exit 1; }
+          test "$pass" -ge 150 || { echo "only $pass tests ran, expected at least 120; tests have gone missing"; exit 1; }
 
       # Every accuracy figure the docs quote is produced here, so a
       # regression in the measurement chain fails the build rather than
