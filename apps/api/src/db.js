@@ -125,6 +125,13 @@ export async function saveScan(pool, report, { recordingId, inCorpus = false }) 
  * measurement and a vanity counter.
  */
 export async function corpusSummary(pool, recordingId) {
+  // Required, not optional. The unscoped path double-counted a whole corpus
+  // once, reporting 7,723 controls where the truth was 3,842, and a doubled
+  // number reads as impressive rather than wrong. A caller that forgets the
+  // recording now fails instead of getting a plausible answer.
+  if (!recordingId) {
+    throw new Error('corpusSummary: a recordingId is required; an unscoped aggregate counts every re-pinned recording again');
+  }
   // Scoped to ONE recording, always. The cache key includes recording_id, so
   // changing the default creates a second set of rows for the same pages
   // rather than replacing them, and an unscoped aggregate then counts every
@@ -149,16 +156,16 @@ export async function corpusSummary(pool, recordingId) {
       max(s.scanned_at)                                        AS last_scan
     FROM scans s
     JOIN elements e ON e.scan_id = s.id
-    WHERE s.in_corpus AND ($1::text IS NULL OR s.recording_id = $1)`, [recordingId ?? null]);
+    WHERE s.in_corpus AND s.recording_id = $1`, [recordingId]);
 
   const { rows: sites } = await pool.query(`
     SELECT s.host, s.final_url, s.title, s.n_targets, s.n_wcag_pass,
            s.n_hand_pass, s.n_standard_not_hand, s.median_hold, s.worst_hold,
            s.viewport, s.scanned_at
       FROM scans s
-     WHERE s.in_corpus AND ($1::text IS NULL OR s.recording_id = $1)
+     WHERE s.in_corpus AND s.recording_id = $1
      ORDER BY s.n_standard_not_hand DESC, s.host
-     LIMIT 200`, [recordingId ?? null]);
+     LIMIT 200`, [recordingId]);
 
   return { aggregate: agg, sites };
 }

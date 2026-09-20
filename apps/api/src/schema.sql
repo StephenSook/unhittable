@@ -82,3 +82,38 @@ CREATE TABLE IF NOT EXISTS corpus_sites (
   added_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
   last_error TEXT
 );
+
+-- ---------------------------------------------------------------------------
+-- UPGRADES.
+--
+-- CREATE TABLE IF NOT EXISTS is not a migration. A database created before a
+-- column existed keeps its old shape while migrate() reports success, and the
+-- first insert afterwards fails on a column that is not there. That is a
+-- deployment landmine rather than a wrong number, but it is the kind that
+-- surfaces at the worst moment, so the additive steps are explicit and
+-- idempotent.
+--
+-- Postgres supports IF NOT EXISTS on ADD COLUMN, so re-running this is free.
+-- ---------------------------------------------------------------------------
+
+ALTER TABLE elements ADD COLUMN IF NOT EXISTS hold_best    DOUBLE PRECISION;
+ALTER TABLE elements ADD COLUMN IF NOT EXISTS hold_spread  DOUBLE PRECISION;
+ALTER TABLE elements ADD COLUMN IF NOT EXISTS binding_side TEXT;
+ALTER TABLE scans    ADD COLUMN IF NOT EXISTS layout_scale REAL;
+
+-- Backfill from the columns an older deployment would have had, so existing
+-- rows stay queryable instead of becoming NULL holes in an aggregate.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_name = 'elements' AND column_name = 'hold_x') THEN
+    UPDATE elements SET hold_best = COALESCE(hold_best, hold) WHERE hold_best IS NULL;
+    UPDATE elements SET hold_spread = COALESCE(hold_spread, 0) WHERE hold_spread IS NULL;
+    UPDATE elements SET binding_side = COALESCE(binding_side, limiting_axis) WHERE binding_side IS NULL;
+    ALTER TABLE elements ALTER COLUMN hold_x DROP NOT NULL;
+    ALTER TABLE elements ALTER COLUMN hold_y DROP NOT NULL;
+  END IF;
+END $$;
+
+UPDATE elements SET hold_best = hold WHERE hold_best IS NULL;
+UPDATE elements SET hold_spread = 0  WHERE hold_spread IS NULL;
