@@ -597,7 +597,8 @@ async function loadCorpus() {
 
 function runSelfTest() {
   // Measured, not asserted. A page arguing that people publish accessibility
-  // numbers without checking them has to check its own.
+  // numbers without checking them has to check its own, and has to publish
+  // the answer even when the answer is against it.
   setTimeout(() => {
     const sel = 'a[href], button, input, select, textarea, [tabindex]:not([tabindex^="-"])';
     const all = [...document.querySelectorAll(sel)].filter((el) => {
@@ -606,20 +607,34 @@ function runSelfTest() {
       return cs.display !== 'none' && cs.visibility !== 'hidden' && r.width > 0 && r.height > 0
         && el.getAttribute('aria-hidden') !== 'true' && !el.disabled;
     });
+
     let smallest = Infinity, offender = null;
+    const ppm = cpiToCssPxPerMm(800);
+    let heldByHand = 0;
     for (const el of all) {
       const r = el.getBoundingClientRect();
-      const cs = getComputedStyle(el);
-      if (cs.display === 'inline') continue;          // the Inline exception
+      if (getComputedStyle(el).display === 'inline') continue;   // the Inline exception
       const m = Math.min(r.width, r.height);
       if (m < smallest) { smallest = m; offender = el; }
+      if (holdFractionRect(state.current.path, ppm, r.width, r.height) >= 0.95) heldByHand++;
     }
-    const ok = smallest >= WCAG_ENHANCED_PX;
+
+    const clearsAAA = smallest >= WCAG_ENHANCED_PX;
+    const k = scaleForHoldRect(state.current.path, ppm, WCAG_MIN_PX, WCAG_MIN_PX, 0.95);
+    const need = k === null ? null : Math.round(WCAG_MIN_PX * k);
+
     $('selfTest').innerHTML =
-      `Measured just now in your browser: <strong>${all.length}</strong> interactive controls on this page. ` +
+      `Measured just now in your browser: <strong>${all.length}</strong> interactive controls. ` +
       `The smallest is <strong>${Math.round(smallest)} px</strong> on its short side, ` +
-      `${ok ? 'which clears the 44 px AAA enhanced size, not merely the 24 px minimum this page is about.'
-            : `which is under the 44 px we hold ourselves to. That is a defect: <code>${esc(offender?.className || offender?.tagName || '')}</code>.`}`;
+      (clearsAAA
+        ? `which clears the 44 px AAA enhanced size, not merely the 24 px minimum this page is about. `
+        : `which is under the 44 px we hold ourselves to, and that is a defect: <code>${esc(offender?.className || offender?.tagName || '')}</code>. `) +
+      `<br><br>And the part that is against us: <strong>${heldByHand} of them</strong> would be reliably held by the ` +
+      `recording currently loaded. ` +
+      (heldByHand === 0
+        ? `None. Holding ourselves to AAA was not enough either, because this hand needs about ${need ?? '116'} px and no design system ships that. `
+        : `The rest would not. `) +
+      `We are not exempt from our own finding, and saying so is cheaper than being caught by it.`;
   }, 700);
 }
 
