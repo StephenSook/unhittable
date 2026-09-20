@@ -1,0 +1,10 @@
+node_modules
+_site
+.git
+.env
+.env.*
+!.env.example
+apps/web
+scripts
+docs
+*.md
