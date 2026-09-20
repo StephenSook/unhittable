@@ -8,3 +8,9 @@ _site/
 coverage/
 .playwright/
 /tmp/
+
+# Expo
+apps/mobile/.expo/
+apps/mobile/android/
+apps/mobile/ios/
+apps/mobile/dist/
