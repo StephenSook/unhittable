@@ -32,6 +32,12 @@
       "permissions": [
         "android.permission.HIGH_SAMPLING_RATE_SENSORS"
       ]
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "4f8bf026-319c-4e37-83b8-1199f31b3cb6"
+      }
+    },
+    "owner": "stephensook"
   }
 }
