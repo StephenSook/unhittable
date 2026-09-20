@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Unhittable</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400..700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  @page { size: 1280px 720px; margin: 0; }
+  :root{--void:#08090a;--surface:#0e1013;--line:#1f242a;--ink:#eceef1;--ink2:#a8b0b8;--dim:#a0a8b0;
+        --alarm:#ff4a1c;--pass:#5bd6a0;--sans:'Instrument Sans',sans-serif;--mono:'IBM Plex Mono',monospace;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--void);font-family:var(--sans);color:var(--ink);-webkit-font-smoothing:antialiased}
+  .s{width:1280px;height:720px;padding:74px 84px;display:flex;flex-direction:column;
+     position:relative;overflow:hidden;page-break-after:always;border-bottom:1px solid #000}
+  .s::before{content:'';position:absolute;inset:0 0 auto 0;height:7px;background:var(--alarm)}
+  .k{font-family:var(--mono);font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)}
+  h1{font-size:96px;line-height:.94;letter-spacing:-.045em;font-weight:700;margin-top:18px}
+  h2{font-size:56px;line-height:1.04;letter-spacing:-.03em;font-weight:700;margin-top:20px;max-width:21ch}
+  p{font-size:23px;line-height:1.5;color:var(--ink2);max-width:60ch;margin-top:22px}
+  .sm{font-size:18.5px;line-height:1.55}
+  em{color:var(--alarm);font-style:normal}
+  b{color:var(--ink);font-weight:600}
+  .grid{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);margin-top:auto}
+  .g4{grid-template-columns:repeat(4,1fr)} .g3{grid-template-columns:repeat(3,1fr)} .g2{grid-template-columns:repeat(2,1fr)}
+  .c{background:var(--surface);padding:24px 22px}
+  .v{font-family:var(--mono);font-size:46px;font-weight:600;letter-spacing:-.03em;line-height:1}
+  .v.bad{color:var(--alarm)} .v.ok{color:var(--pass)}
+  .l{font-size:14.5px;line-height:1.45;color:var(--ink2);margin-top:11px}
+  .foot{margin-top:auto;padding-top:22px;border-top:1px solid var(--line);
+        display:flex;justify-content:space-between;font-family:var(--mono);font-size:13px;color:var(--dim)}
+  .rows{margin-top:auto;width:100%;border-collapse:collapse;font-size:19px}
+  .rows td{padding:15px 14px;border-bottom:1px solid var(--line);color:var(--ink2)}
+  .rows td:first-child{color:var(--ink);font-weight:600;width:46%}
+  .rows td:last-child{font-family:var(--mono);text-align:right;color:var(--ink)}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:54px;margin-top:auto}
+  .cap{font-family:var(--mono);font-size:13px;color:var(--dim);margin-top:14px;letter-spacing:.04em}
+</style></head><body>
+
+<section class="s">
+  <p class="k">SASEhack 2026 · Education, Accessibility &amp; Social Impact · Hardware</p>
+  <h1>Unhittable</h1>
+  <p style="font-size:30px;max-width:44ch;margin-top:30px">
+    WCAG says a button must be <b>24 pixels</b>. We replayed <em>52 clinically recorded tremors</em>
+    against that number, then measured <b>3,881 real controls</b> on 38 live sites.
+  </p>
+  <div class="foot"><span>stephensook.github.io/unhittable</span><span>github.com/StephenSook/unhittable</span></div>
+</section>
+
+<section class="s">
+  <p class="k">The rule that governs every button you ship</p>
+  <h2>WCAG 2.2, SC 2.5.8, Level AA.</h2>
+  <p>Every accessibility checker on the market measures your controls against <b>24 by 24 CSS pixels</b>
+     and prints a green tick. axe-core, Lighthouse, whatever your company pays for.</p>
+  <p>Its published basis is <b>Parhi, Karlson &amp; Bederson, MobileHCI 2006</b>: a one-handed thumb
+     study of <em>able-bodied participants</em> on small touchscreens.</p>
+  <p class="sm">axe-core's own rule page names "people who have mobility impairments such as hand
+     tremors" as the beneficiaries, and then applies 24&nbsp;px to everyone.</p>
+  <div class="foot"><span>24 px = 6.35 mm of glass</span><span>01</span></div>
+</section>
+
+<section class="s">
+  <p class="k">What we measured</p>
+  <h2>Four steps, all real.</h2>
+  <table class="rows">
+    <tr><td>1 · Clinical recordings</td><td>PADS on PhysioNet · Apple Watch · 100 Hz · 260 people</td></tr>
+    <tr><td>2 · Acceleration to distance</td><td>band-limited double integration, gyro-corrected</td></tr>
+    <tr><td>3 · Distance to pixels</td><td>800 cpi mouse: 1 mm of hand = 31.5 CSS px</td></tr>
+    <tr><td>4 · Against a real page</td><td>headless Chromium measures every control as rendered</td></tr>
+  </table>
+  <div class="foot"><span>target size is a LAYOUT property, so the page must actually be laid out</span><span>02</span></div>
+</section>
+
+<section class="s">
+  <p class="k">The cohort, not one flattering recording</p>
+  <h2>1,560 recordings. 260 assessed people.</h2>
+  <p>Only <b>52</b> contain a tremor that clears a bar <em>zero of 2,300 null draws</em> reach.
+     Most recordings have none, and we publish that.</p>
+  <div class="grid g4">
+    <div class="c"><div class="v">2.31<span style="font-size:22px"> mm</span></div><div class="l">median amplitude of the 52, which is 73 px of cursor travel</div></div>
+    <div class="c"><div class="v bad">41</div><div class="l">of 52 are wider than the entire 24 px target</div></div>
+    <div class="c"><div class="v bad">36</div><div class="l">hold a 24 px target less than 95% of the time</div></div>
+    <div class="c"><div class="v bad">29</div><div class="l">still fail at the 44 px AAA enhanced size</div></div>
+  </div>
+  <div class="foot"><span>essential tremor has the highest detection rate, 14.6%, and affects ~10x more people than Parkinson's</span><span>03</span></div>
+</section>
+
+<section class="s">
+  <p class="k">Then we pointed it at the web</p>
+  <h2>38 live sites. 3,881 controls.</h2>
+  <p>Government services, healthcare, the disease organisations whose own audiences have tremor,
+     and the accessibility vendors who sell the audits.</p>
+  <div class="grid g3">
+    <div class="c"><div class="v ok">95.9%</div><div class="l">PASS WCAG 2.5.8, including the spacing exception</div></div>
+    <div class="c"><div class="v bad">74.1%</div><div class="l">of those cannot be reliably held by a median recorded tremor</div></div>
+    <div class="c"><div class="v">141<span style="font-size:24px">&times;</span>30</div><div class="l">the median control on the web, in CSS pixels</div></div>
+  </div>
+  <div class="foot"><span>bound by HEIGHT on 3,374 controls, by width on 247</span><span>04</span></div>
+</section>
+
+<section class="s">
+  <p class="k">Why a square minimum cannot see it</p>
+  <h2>The web is built from wide, short buttons.</h2>
+  <p>A 141 by 30 control passes, because both sides clear 24. The <em>short side</em> is what a hand
+     actually has to hold, and a single number for "target size" hides which one it is.</p>
+  <p>On the Social Security Administration's homepage: <b>108 controls, zero fail the standard,
+     95 pass it and still cannot be held.</b></p>
+  <div class="foot"><span>ssa.gov, scanned live, 5.1 seconds</span><span>05</span></div>
+</section>
+
+<section class="s">
+  <p class="k">What we shipped</p>
+  <h2>A finding, and the instrument that produced it.</h2>
+  <div class="two">
+    <div>
+      <p class="k" style="color:var(--alarm)">Web</p>
+      <p class="sm">Paste any URL. Real Chromium loads it, waits for fonts, measures every control as
+      rendered, and replays the recording against each rectangle. About three seconds.</p>
+      <p class="sm">Everything on the page is recomputed in your browser from the committed
+      recordings. Nothing is precomputed.</p>
+    </div>
+    <div>
+      <p class="k" style="color:var(--alarm)">Android</p>
+      <p class="sm">Measures <b>your</b> hand from the phone's accelerometer, works out the button size
+      you need, then <em>checks that prediction against your own taps.</em></p>
+      <p class="sm">On a touchscreen a millimetre of finger is a millimetre off target, with no
+      counts-per-inch to sweep. Calibrate against a bank card and the millimetres are real.</p>
+    </div>
+  </div>
+  <div class="foot"><span>138 tests · CI green · SSRF-fenced · Lighthouse 100 accessibility</span><span>06</span></div>
+</section>
+
+<section class="s">
+  <p class="k">What we got wrong, and how we know</p>
+  <h2>An adversarial review nearly killed this.</h2>
+  <table class="rows">
+    <tr><td>A Hann window never removed</td><td>a true 2.000 mm read as 0.778 mm at the record's edge</td></tr>
+    <tr><td>The gyroscope sat unused</td><td>5&deg; of wrist rotation faked 1.75 mm of movement</td></tr>
+    <tr><td>A robots.txt matcher</td><td>silently excluded 18 of 40 sites, all wrongly</td></tr>
+    <tr><td>DNS rebinding in the scanner</td><td>two lookups, and an attacker answers them differently</td></tr>
+  </table>
+  <p class="cap">Both measurement errors were in our own favour. Correcting them made the finding
+    STRONGER: median hold fell from 74% to 58%.</p>
+  <div class="foot"><span>thirteen of these are written up in docs/FALSE-GREENS.md</span><span>07</span></div>
+</section>
+
+<section class="s">
+  <p class="k">What we are not claiming</p>
+  <h2>The honest boundary.</h2>
+  <table class="rows">
+    <tr><td>We do not diagnose anyone</td><td>condition labels are the dataset's, verbatim</td></tr>
+    <tr><td>Measuring tremor is solved</td><td>StudyMyTremor has shipped millimetres since 2016</td></tr>
+    <tr><td>Adaptive sizing is not new</td><td>SUPPLE++ 2007, Sarcar 2018, ABD-MT 2024</td></tr>
+    <tr><td>Most recordings show nothing</td><td>52 of 1,560, and we publish the other 1,508</td></tr>
+    <tr><td>Our own page fails too</td><td>44 px is AAA and still not enough for this hand</td></tr>
+  </table>
+  <p class="cap">New here: clinically recorded tremor, in physical units, evaluated against
+    WCAG 2.5.8 itself, on pages that are actually shipping.</p>
+  <div class="foot"><span>08</span></div>
+</section>
+
+<section class="s">
+  <p class="k">Who it is for</p>
+  <h2>About 11 million hands in the US alone.</h2>
+  <p>Roughly <b>10 million</b> people live with essential tremor and <b>1 million</b> with Parkinson's.
+     Every one of them is currently told by an automated green check that your 24-pixel button is fine.</p>
+  <p>The fix is not a new standard. It is a number that was never checked, and a tool that checks it
+     in three seconds against a page you already shipped.</p>
+  <div class="foot"><span>stephensook.github.io/unhittable</span><span>09</span></div>
+</section>
+
+</body></html>
