@@ -242,13 +242,19 @@ function tick() {
   const x = (p.x[i] + (p.x[j] - p.x[i]) * frac) * ppm;
   const y = (p.y[i] + (p.y[j] - p.y[i]) * frac) * ppm;
 
-  const cx = w / 2 + x, cy = h / 2 + y;
   const half = state.size / 2;
   const inside = Math.abs(x) <= half && Math.abs(y) <= half;
 
+  // The cursor element is already centred by left:50%/top:50%, so it is
+  // translated by the EXCURSION only. Adding w/2 here as well put it at
+  // double the offset, which the trail canvas did not do because the canvas
+  // is inset:0 and draws in absolute stage coordinates. The two disagreed on
+  // screen, which is how it was caught.
   const c = $('cursor');
-  c.style.transform = `translate(${cx}px, ${cy}px)`;
+  c.style.transform = `translate(${x}px, ${y}px)`;
   c.dataset.inside = String(inside);
+
+  const cx = w / 2 + x, cy = h / 2 + y;
 
   frames++; if (inside) insideCount++;
   if (frames % 8 === 0) {
