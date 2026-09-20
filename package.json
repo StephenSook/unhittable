@@ -1,0 +1,20 @@
+{
+  "name": "unhittable",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Measure whether a hand with a clinically recorded tremor can actually hit the targets on a web page.",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "test": "node --test packages/core/test/*.mjs",
+    "test:all": "node --test packages/core/test/*.mjs apps/api/test/*.mjs",
+    "build:web": "node scripts/build-web.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT"
+}
